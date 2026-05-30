@@ -84,18 +84,6 @@
 
             <!-- 頂部控制面板 -->
             <div class="flex flex-wrap items-center gap-3">
-                <!-- 股息自動監控開關 -->
-                <div class="bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800 flex items-center gap-2">
-                    <div class="flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="monitor-status-dot"></span>
-                        <span class="text-[10px] font-semibold text-slate-300">自動股息監控</span>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="auto-dividend-toggle" class="sr-only peer" checked>
-                        <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-                    </label>
-                </div>
-
                 <!-- 市場價格微幅波動開關 -->
                 <div class="bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800 flex items-center gap-2">
                     <span class="text-[10px] font-semibold text-slate-300">市場實時波動</span>
@@ -224,7 +212,7 @@
                                 <th class="p-4 text-right">現價</th>
                                 <th class="p-4 text-right">市值</th>
                                 <th class="p-4">TP / SL 計劃目標</th>
-                                <th class="p-4 text-right">估計盈虧</th>
+                                <th class="p-4 text-right">持倉總收益 (含股息)</th>
                                 <th class="p-4 text-center">操作</th>
                             </tr>
                         </thead>
@@ -345,27 +333,7 @@
                 </div>
             </div>
 
-            <div class="bg-gradient-to-b from-slate-900 to-slate-950 p-5 rounded-2xl border border-slate-800 shadow-xl">
-                <h3 class="text-xs font-bold text-white flex items-center gap-1.5 mb-2">
-                    <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> 模擬事件與除淨控制
-                </h3>
-                <p class="text-[10px] text-slate-400 mb-4">手動在背景模擬除淨派息事件（自動依持股精算手續費），或一鍵模擬在港美市場中進行一筆標準股票定額買入。</p>
-                <div class="grid grid-cols-2 gap-2">
-                    <button onclick="triggerSimulatedDividend('HK')" class="p-2.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-[10px] rounded-xl font-bold text-slate-300 transition-all text-center flex flex-col items-center gap-1">
-                        <span class="text-amber-500 font-extrabold text-xs">HKD 派息</span>
-                        <span>港股除淨模擬</span>
-                    </button>
-                    <button onclick="triggerSimulatedDividend('US')" class="p-2.5 bg-slate-850 hover:bg-slate-800 border border-slate-800 text-[10px] rounded-xl font-bold text-slate-300 transition-all text-center flex flex-col items-center gap-1">
-                        <span class="text-emerald-500 font-extrabold text-xs">USD 派息</span>
-                        <span>美股除淨模擬</span>
-                    </button>
-                    <button onclick="triggerSimulatedRandomBuy()" class="col-span-2 p-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/10">
-                        <i data-lucide="play" class="w-4 h-4"></i> 模擬市場隨機定額「股票買入」事件
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-slate-900/40 rounded-2xl border border-slate-850 shadow-lg flex flex-col h-[400px]">
+            <div class="bg-slate-900/40 rounded-2xl border border-slate-850 shadow-lg flex flex-col h-[520px]">
                 <div class="p-4 border-b border-slate-850 flex justify-between items-center bg-slate-950/20">
                     <div class="flex items-center gap-1.5">
                         <i data-lucide="scroll" class="w-4 h-4 text-amber-400"></i>
@@ -646,6 +614,13 @@
             }
         }
 
+        // 格式化不含前綴的貨幣輸出
+        function formatValNoPrefix(amount, market) {
+            const safeVal = parseFloat(amount) || 0;
+            const prefix = market === 'HK' ? 'HK$' : 'US$';
+            return prefix + ' ' + safeVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
         // 動態淺深色輸入框引擎
         function initDynamicInputs() {
             document.querySelectorAll('.dynamic-input').forEach(el => {
@@ -764,7 +739,7 @@
             lucide.createIcons();
         }
 
-        // 渲染個股持倉列表 (加入「刪除」與「一鍵平倉」功能)
+        // 渲染個股持倉列表 (包含「持倉總收益（含累計股息）」)
         function updateHoldingsTable() {
             const tbody = document.getElementById('holdings-table-body');
             tbody.innerHTML = '';
@@ -790,17 +765,28 @@
 
                 const value = shares * currentPrice;
                 const cost = shares * avgCost;
-                const pnl = value - cost;
-                const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
+
+                // 🌟 動態計算累計派息 (由流水帳數據中精準獲取)
+                const cumDividends = state.transactions
+                    .filter(t => t.type === 'DIVIDEND' && t.symbol === h.symbol)
+                    .reduce((sum, t) => sum + (parseFloat(t.netAmount) || 0), 0);
+
+                const unrealizedPnl = value - cost;
+                const totalReturn = unrealizedPnl + cumDividends;
+                const totalRoi = cost > 0 ? (totalReturn / cost) * 100 : 0;
 
                 const valueString = h.market === 'HK' ? formatVal(value, null) : formatVal(null, value);
                 const costPriceString = h.market === 'HK' ? `HK$ ${avgCost.toFixed(2)}` : `US$ ${avgCost.toFixed(4)}`;
                 const currentPriceString = h.market === 'HK' ? `HK$ ${currentPrice.toFixed(2)}` : `US$ ${currentPrice.toFixed(2)}`;
 
-                const pnlColorClass = pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                const pnlSign = pnl >= 0 ? '+' : '';
+                // 顏色與符號標記
+                const pnlColorClass = unrealizedPnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const pnlSign = unrealizedPnl >= 0 ? '+' : '';
+                
+                const totalColorClass = totalReturn >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const totalSign = totalReturn >= 0 ? '+' : '';
 
-                // TP/SL 標籤渲染
+                // TP/SL 標籤
                 let planBadges = '';
                 if (tpPrice > 0) {
                     planBadges += `<span onclick="simulatePlanTrigger(${index}, 'TP')" class="cursor-pointer px-1.5 py-0.5 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mr-1 font-bold">TP: ${tpPrice.toFixed(2)}</span>`;
@@ -824,12 +810,26 @@
                     <td class="p-4 text-right font-bold text-slate-200">${currentPriceString}</td>
                     <td class="p-4 text-right font-semibold text-white">${valueString}</td>
                     <td class="p-4">${planBadges}</td>
-                    <td class="p-4 text-right ${pnlColorClass} font-bold">
-                        <div>${pnlSign}${h.market === 'HK' ? formatVal(pnl, null) : formatVal(null, pnl)}</div>
-                        <div class="text-[9px] font-semibold">${pnlSign}${pnlPercent.toFixed(2)}%</div>
+                    <td class="p-4 text-right">
+                        <!-- 🌟 升級版：精細拆分多維收益欄位 -->
+                        <div class="text-[9.5px] text-slate-400 leading-tight">
+                            帳面: <span class="${pnlColorClass} font-semibold">${pnlSign}${formatValNoPrefix(unrealizedPnl, h.market)}</span>
+                        </div>
+                        <div class="text-[9.5px] text-slate-400 leading-tight">
+                            股息: <span class="text-amber-400 font-semibold">+${formatValNoPrefix(cumDividends, h.market)}</span>
+                        </div>
+                        <div class="font-extrabold ${totalColorClass} text-[11px] mt-1 border-t border-slate-800/80 pt-0.5">
+                            總計: ${totalSign}${formatValNoPrefix(totalReturn, h.market)}
+                        </div>
+                        <div class="text-[9px] font-bold ${totalColorClass}">
+                            (${totalSign}${totalRoi.toFixed(2)}%)
+                        </div>
                     </td>
                     <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-2">
+                            <button onclick="openTradeModalWithData('BUY', '${h.symbol}', '${h.market}', '${h.name || ''}')" class="text-[10px] font-bold text-amber-400 hover:text-amber-300 px-2 py-1 rounded hover:bg-amber-500/10 transition-all" title="為此個股進行買入/賣出或股息補記錄">
+                                補記錄
+                            </button>
                             <button onclick="sellHoldingQuick(${index})" class="text-[10px] font-bold text-rose-400 hover:text-rose-300 px-2 py-1 rounded hover:bg-rose-500/10 transition-all">
                                 一鍵平倉
                             </button>
@@ -841,6 +841,16 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // 開啟並自動填入個股資料的補記錄視窗
+        function openTradeModalWithData(type, symbol, market, name) {
+            openTradeModal(type);
+            document.getElementById('field-market').value = market;
+            document.getElementById('field-symbol').value = symbol;
+            document.getElementById('field-name').value = name;
+            onMarketChange();
+            initDynamicInputs();
         }
 
         // 渲染流水帳紀錄
@@ -1094,7 +1104,6 @@
             const slEl = document.getElementById('field-sl');
             const tpEl = document.getElementById('field-tp');
 
-            // 安全性 Fallback 宣告，避免 DOM 尚未就緒時崩潰
             const market = marketEl ? marketEl.value : 'US';
             const type = typeEl ? typeEl.value : 'BUY';
             const shares = sharesEl ? (parseFloat(sharesEl.value) || 0) : 0;
@@ -1531,148 +1540,6 @@
             refreshUI();
         }
 
-        // 觸發模擬公司派息除淨事件
-        function triggerSimulatedDividend(market) {
-            const candidates = state.holdings.filter(h => h.market === market);
-            if (candidates.length === 0) {
-                showToast('無合適持倉', `您目前沒有持有任何 ${market==='HK'?'港股':'美股'} 庫存，無法模擬自動分派利息。`, 'info');
-                return;
-            }
-
-            const randHolding = candidates[Math.floor(Math.random() * candidates.length)];
-            const dps = parseFloat(defaultStockData[randHolding.symbol] ? defaultStockData[randHolding.symbol].div : 0.25) || 0.25;
-
-            if (dps <= 0) {
-                showToast('無派息政策', `${randHolding.symbol} 目前暫無股利發放。`, 'info');
-                return;
-            }
-
-            const shares = parseFloat(randHolding.shares) || 0;
-            const gross = shares * dps;
-            let finalNet = 0;
-            let tax = 0;
-            let fee = 0;
-
-            if (market === 'HK') {
-                fee = Math.max(30, gross * 0.002);
-                finalNet = Math.max(0, gross - fee);
-                state.balances.HKD += finalNet;
-            } else {
-                tax = gross * 0.30;
-                fee = Math.max(1, Math.min(5, (gross - tax) * 0.01));
-                finalNet = Math.max(0, gross - tax - fee);
-                state.balances.USD += finalNet;
-            }
-
-            state.transactions.push({
-                id: 'div-sim-' + Date.now(),
-                date: new Date().toLocaleString(),
-                type: 'DIVIDEND',
-                symbol: randHolding.symbol,
-                market: randHolding.market,
-                shares: shares,
-                price: dps,
-                grossAmount: gross,
-                commission: 0, platformFee: 0, taxes: tax,
-                netAmount: finalNet,
-                notes: `系統自動派息：每股配息 ${dps.toFixed(2)}，持股 ${shares.toFixed(2)} 股。代扣費用合共 ${market==='HK'?'HKD':'USD'} ${(tax+fee).toFixed(2)}`
-            });
-
-            showDividendToast(randHolding.symbol, market === 'HK' ? 'HKD' : 'USD', gross, tax, fee, finalNet);
-            saveData();
-            refreshUI();
-        }
-
-        // 模擬市場隨機定額「股票買入」事件
-        function triggerSimulatedRandomBuy() {
-            const symbols = Object.keys(defaultStockData);
-            const randSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-            const stock = defaultStockData[randSymbol];
-
-            const market = stock.market;
-            const price = parseFloat(stock.price) || 10;
-            const budget = Math.floor(Math.random() * 10000) + 5000;
-
-            let shares = 0;
-            if (market === 'HK') {
-                let tempShares = Math.floor(budget / price);
-                while (tempShares > 0) {
-                    const fees = getTigerFees(market, tempShares, price, 'BUY');
-                    if ((tempShares * price) + (fees.total || 0) <= budget) {
-                        break;
-                    }
-                    tempShares--;
-                }
-                shares = tempShares;
-            } else {
-                const minFees = getTigerFees('US', (budget - 1.99) / price, price, 'BUY');
-                shares = (budget - (minFees.total || 0)) / price;
-            }
-
-            if (shares <= 0) {
-                showToast('模擬買入失敗', '隨機生成預算不足以在當前現價買入一股股票', 'info');
-                return;
-            }
-
-            const fees = getTigerFees(market, shares, price, 'BUY');
-            const feesTotal = fees.total || 0;
-            const totalCost = (shares * price) + feesTotal;
-
-            if (market === 'HK') {
-                if (state.balances.HKD < totalCost) {
-                    state.balances.HKD += budget * 2; 
-                }
-                state.balances.HKD -= totalCost;
-            } else {
-                if (state.balances.USD < totalCost) {
-                    state.balances.USD += budget * 2;
-                }
-                state.balances.USD -= totalCost;
-            }
-
-            // 更新持倉
-            let holding = state.holdings.find(h => h.symbol === randSymbol && h.market === market);
-            const slPrice = parseFloat((price * 0.9).toFixed(2)); 
-
-            if (holding) {
-                const origCost = holding.shares * holding.avgCost;
-                holding.shares += shares;
-                holding.avgCost = (origCost + (shares * price)) / holding.shares;
-                holding.sl = slPrice;
-            } else {
-                state.holdings.push({
-                    symbol: randSymbol,
-                    name: stock.name,
-                    market,
-                    shares,
-                    avgCost: price,
-                    currentPrice: price,
-                    tp: parseFloat((price * 1.3).toFixed(2)), 
-                    sl: slPrice
-                });
-            }
-
-            state.transactions.push({
-                id: 'tx-sim-buy-' + Date.now(),
-                date: new Date().toLocaleString(),
-                type: 'BUY',
-                symbol: randSymbol,
-                market,
-                shares,
-                price,
-                grossAmount: shares * price,
-                commission: fees.commission || 0,
-                platformFee: fees.platformFee || 0,
-                taxes: fees.taxes || 0,
-                netAmount: totalCost,
-                notes: `【模擬市場隨機買入】：預算金額 ${market==='HK'?'HKD':'USD'} ${budget}。成交 ${shares.toFixed(market==='HK'?0:4)} 股，已設 10% 止損防禦點`
-            });
-
-            saveData();
-            refreshUI();
-            showToast('模擬定額交易', `市場隨機交易撮合成功！已購入 ${shares.toFixed(market==='HK'?0:4)} 股 ${randSymbol}`, 'success');
-        }
-
         // 定時：市場價格跳動
         function runMarketFluctuations() {
             const active = document.getElementById('market-fluctuation-toggle').checked;
@@ -1715,57 +1582,6 @@
             document.getElementById('val-total-assets').textContent = formatVal(totalAssetsHkd, null);
         }
 
-        // 定時：自動股息掃描
-        function runAutoDividendScan() {
-            const autoDivEnabled = document.getElementById('auto-dividend-toggle').checked;
-            if (!autoDivEnabled || state.holdings.length === 0) return;
-            if (Math.random() > 0.3) return; 
-
-            const randHolding = state.holdings[Math.floor(Math.random() * state.holdings.length)];
-            triggerDividendProcess(randHolding);
-        }
-
-        function triggerDividendProcess(holding) {
-            const dpsData = defaultStockData[holding.symbol] || { div: holding.market === 'HK' ? 1.5 : 0.25 };
-            const dps = parseFloat(dpsData.div) || 0.25;
-            if (dps <= 0) return;
-
-            const shares = parseFloat(holding.shares) || 0;
-            const gross = shares * dps;
-            let finalNet = 0;
-            let tax = 0;
-            let fee = 0;
-
-            if (holding.market === 'US') {
-                tax = gross * 0.30;
-                fee = Math.max(1.00, Math.min(5.00, (gross - tax) * 0.01));
-                finalNet = Math.max(0, gross - tax - fee);
-                state.balances.USD += finalNet;
-            } else {
-                fee = Math.max(30.00, gross * 0.002);
-                finalNet = Math.max(0, gross - fee);
-                state.balances.HKD += finalNet;
-            }
-
-            state.transactions.push({
-                id: 'div-' + Date.now(),
-                date: new Date().toLocaleString(),
-                type: 'DIVIDEND',
-                symbol: holding.symbol,
-                market: holding.market,
-                shares: shares,
-                price: dps,
-                grossAmount: gross,
-                commission: 0, platformFee: 0, taxes: tax,
-                netAmount: finalNet,
-                notes: `除淨日股息到帳：${holding.symbol} 派發 ${holding.market==='HK'?'HKD':'USD'} ${dps.toFixed(2)}。扣除老虎手續費與稅務規費。`
-            });
-
-            showDividendToast(holding.symbol, holding.market === 'HK' ? 'HKD' : 'USD', gross, tax, fee, finalNet);
-            saveData();
-            refreshUI();
-        }
-
         // 渲染浮動 Toast 通知
         function showToast(title, text, type = 'info') {
             const container = document.getElementById('toast-container');
@@ -1790,39 +1606,6 @@
                 toast.classList.add('toast-exit');
                 setTimeout(() => toast.remove(), 500);
             }, 4000);
-        }
-
-        // 金色股息到帳 Toast
-        function showDividendToast(symbol, currency, gross, tax, fee, net) {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = "toast-enter p-4 rounded-2xl shadow-2xl border border-amber-500/50 bg-gradient-to-r from-slate-950 to-slate-900 text-white pointer-events-auto max-w-xs";
-            
-            toast.innerHTML = `
-                <div class="flex items-start gap-2.5">
-                    <div class="text-amber-400 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 animate-bounce">
-                        <i data-lucide="gift" class="w-5 h-5"></i>
-                    </div>
-                    <div class="flex-grow">
-                        <h4 class="text-xs font-extrabold text-amber-400 flex items-center justify-between">
-                            <span>TIGER 股息到帳通知</span>
-                            <span class="text-[8px] bg-amber-500/20 px-1 rounded">${symbol}</span>
-                        </h4>
-                        <div class="mt-1.5 space-y-1 text-[9px] text-slate-400">
-                            <div class="flex justify-between"><span>毛股息：</span><span>${currency} ${gross.toFixed(2)}</span></div>
-                            ${tax > 0 ? `<div class="flex justify-between text-rose-400"><span>預扣稅30%：</span><span>- ${currency} ${tax.toFixed(2)}</span></div>` : ''}
-                            <div class="flex justify-between text-rose-400"><span>老虎手續費：</span><span>- ${currency} ${fee.toFixed(2)}</span></div>
-                            <div class="border-t border-slate-800 pt-1 flex justify-between font-extrabold text-emerald-400"><span>實收淨額：</span><span>+ ${currency} ${net.toFixed(2)}</span></div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            container.appendChild(toast);
-            lucide.createIcons();
-            setTimeout(() => {
-                toast.classList.add('toast-exit');
-                setTimeout(() => toast.remove(), 500);
-            }, 6000);
         }
 
         // 數據備份與還原
@@ -1988,9 +1771,8 @@
             initDynamicInputs();
             updateLiveCalculations();
 
-            // 啟動定時監控
+            // 啟動定時監控 (僅保留市場價格跳動)
             setInterval(runMarketFluctuations, 4000); 
-            setInterval(runAutoDividendScan, 15000);  
         };
     </script>
 </body>
