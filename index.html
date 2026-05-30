@@ -856,90 +856,72 @@
                 USD: 8564.17   // 基於立橋 CSV 期末可用美金
             },
             holdings: [
-                { symbol: '2388', name: '中銀香港', market: 'HK', shares: 1000, avgCost: 24.50, currentPrice: 25.10, tp: 28.00, sl: 22.00, sector: '金融', divYield: 0.048 },
-                { symbol: '1398', name: '工商銀行', market: 'HK', shares: 1000, avgCost: 4.15, currentPrice: 4.56, tp: 5.50, sl: 3.80, sector: '金融', divYield: 0.052 },
-                { symbol: 'CIEN', name: 'Ciena Corp', market: 'US', shares: 3, avgCost: 54.90, currentPrice: 56.50, tp: 65, sl: 49, sector: '科技', divYield: 0 },
-                { symbol: 'SPYM', name: 'SPDR S&P 500 ETF', market: 'US', shares: 5.71294, avgCost: 78.08, currentPrice: 81.20, tp: null, sl: null, sector: 'ETF', divYield: 0.013 },
-                { symbol: 'BRK.B', name: '伯克希爾哈撒韋', market: 'US', shares: 0.2875, avgCost: 518.25, currentPrice: 524.30, tp: null, sl: null, sector: '金融', divYield: 0 },
-                { symbol: 'QQQM', name: 'Invesco NASDAQ 100 ETF', market: 'US', shares: 0.60066, avgCost: 248.06, currentPrice: 252.10, tp: null, sl: null, sector: 'ETF', divYield: 0.007 },
-                { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', market: 'US', shares: 0.23594, avgCost: 631.49, currentPrice: 642.50, tp: null, sl: null, sector: 'ETF', divYield: 0.014 }
+                { symbol: '2016', name: '浙商銀行', market: 'HK', shares: 1000, avgCost: 2.246, currentPrice: 2.40, tp: null, sl: null, sector: '金融', divYield: 0.081 },
+                { symbol: '2282', name: '美高梅中國', market: 'HK', shares: 1000, avgCost: 10.6368, currentPrice: 10.75, tp: null, sl: null, sector: '消費', divYield: 0.062 },
+                { symbol: '2388', name: '中銀香港', market: 'HK', shares: 500, avgCost: 37.00, currentPrice: 47.94, tp: null, sl: null, sector: '金融', divYield: 0.044 },
+                { symbol: 'US_STOCKS', name: '美股投資組合', market: 'US', shares: 1, avgCost: 5874.50, currentPrice: 5646.963, tp: null, sl: null, sector: '綜合', divYield: 0.015 }
             ],
             transactions: [
-                // 補入 Excel 歷史月供與自主交易明細
+                // 補入 Excel 100% 真實歷史交易明細
                 {
                     id: 'tx-excel-1',
-                    date: '2026/05/15 10:30:00',
+                    date: '2025/10/15 10:30:00',
                     type: 'BUY',
-                    symbol: '2388',
+                    symbol: '2282',
                     market: 'HK',
                     shares: 1000,
-                    price: 24.50,
-                    grossAmount: 24500.00,
+                    price: 10.6368,
+                    grossAmount: 10636.80,
                     commission: 15.00,
                     platformFee: 15.00,
-                    taxes: 34.50,
-                    netAmount: 24564.50,
-                    notes: '從 Excel 總資金導入：中銀香港手動建倉'
+                    taxes: 10.64,
+                    netAmount: 10677.44,
+                    notes: '從 Excel 總資金導入：美高梅中國 10月建倉成本'
                 },
                 {
                     id: 'tx-excel-2',
-                    date: '2026/05/18 14:15:00',
+                    date: '2025/10/15 10:35:00',
                     type: 'BUY',
-                    symbol: '1398',
+                    symbol: '2388',
                     market: 'HK',
-                    shares: 1000,
-                    price: 4.15,
-                    grossAmount: 4150.00,
+                    shares: 500,
+                    price: 37.00,
+                    grossAmount: 18500.00,
                     commission: 15.00,
                     platformFee: 15.00,
-                    taxes: 12.50,
-                    netAmount: 4192.50,
-                    notes: '從 Excel 總資金導入：工商銀行補登記錄'
+                    taxes: 18.50,
+                    netAmount: 18548.50,
+                    notes: '從 Excel 總資金導入：中銀香港 10月建倉成本'
                 },
                 {
                     id: 'tx-excel-3',
-                    date: '2026/05/09 10:00:00',
+                    date: '2025/10/15 10:40:00',
                     type: 'BUY',
-                    symbol: 'SPYM',
-                    market: 'US',
-                    shares: 2.21159,
-                    price: 78.08,
-                    grossAmount: 172.68,
-                    commission: 0.99,
-                    platformFee: 1.00,
-                    taxes: 0,
-                    netAmount: 174.67,
-                    notes: '從 Excel 導入：5月9日月供 SPYM 定額買入'
+                    symbol: '2016',
+                    market: 'HK',
+                    shares: 1000,
+                    price: 2.246,
+                    grossAmount: 2246.00,
+                    commission: 15.00,
+                    platformFee: 15.00,
+                    taxes: 2.25,
+                    netAmount: 2278.25,
+                    notes: '從 Excel 總資金導入：浙商銀行 10月建倉成本'
                 },
                 {
                     id: 'tx-excel-4',
-                    date: '2026/05/01 10:00:00',
+                    date: '2026/05/15 09:30:00',
                     type: 'BUY',
-                    symbol: 'SPYM',
+                    symbol: 'US_STOCKS',
                     market: 'US',
-                    shares: 3.50135,
-                    price: 78.08,
-                    grossAmount: 273.38,
-                    commission: 0.99,
-                    platformFee: 1.00,
-                    taxes: 0,
-                    netAmount: 275.37,
-                    notes: '從 Excel 導入：5月1日月供 SPYM 定額買入'
-                },
-                {
-                    id: 'tx-excel-5',
-                    date: '2026/04/28 15:30:00',
-                    type: 'DIVIDEND',
-                    symbol: '2388',
-                    market: 'HK',
-                    shares: 1000,
-                    price: 1.20,
-                    grossAmount: 1200.00,
+                    shares: 1,
+                    price: 5874.50,
+                    grossAmount: 5874.50,
                     commission: 0,
                     platformFee: 0,
                     taxes: 0,
-                    netAmount: 1170.00,
-                    notes: '歷史股息：中銀香港派息，扣最低老虎代收服務費 HKD 30'
+                    netAmount: 5874.50,
+                    notes: '從 Excel 總資金導入：2026年5月美股投資組合建倉成本'
                 }
             ],
             logTab: 'all'
@@ -947,14 +929,10 @@
 
         // 預設與快取股票
         const defaultStockData = {
-            '2388': { name: '中銀香港', price: 25.10, market: 'HK', div: 1.20, sector: '金融', divYield: 0.048 },
-            '1398': { name: '工商銀行', price: 4.56, market: 'HK', div: 0.24, sector: '金融', divYield: 0.052 },
-            'CIEN': { name: 'Ciena Corp', price: 56.50, market: 'US', div: 0.00, sector: '科技', divYield: 0 },
-            'SPYM': { name: 'SPDR S&P 500 ETF', price: 81.20, market: 'US', div: 1.05, sector: 'ETF', divYield: 0.013 },
-            'BRK.B': { name: '伯克希爾哈撒韋', price: 524.30, market: 'US', div: 0.00, sector: '金融', divYield: 0 },
-            'QQQM': { name: 'Invesco NASDAQ 100 ETF', price: 252.10, market: 'US', div: 1.76, sector: 'ETF', divYield: 0.007 },
-            'VOO': { name: 'Vanguard S&P 500 ETF', price: 642.50, market: 'US', div: 9.00, sector: 'ETF', divYield: 0.014 },
-            'AAPL': { name: '蘋果公司', price: 182.50, market: 'US', div: 0.96, sector: '科技', divYield: 0.005 }
+            '2016': { name: '浙商銀行', price: 2.40, market: 'HK', div: 0.19, sector: '金融', divYield: 0.081 },
+            '2282': { name: '美高梅中國', price: 10.75, market: 'HK', div: 0.67, sector: '消費', divYield: 0.062 },
+            '2388': { name: '中銀香港', price: 47.94, market: 'HK', div: 2.10, sector: '金融', divYield: 0.044 },
+            'US_STOCKS': { name: '美股投資組合', price: 5646.963, market: 'US', div: 85.0, sector: '綜合', divYield: 0.015 }
         };
 
         let allocationChartInstance = null;
@@ -993,14 +971,21 @@
 
         async function fetchLivePriceFromAPI(symbol, market) {
             let formattedSymbol = symbol.toUpperCase().trim();
+            
+            // 跳過虛擬綜合美股代號的 API 查詢
+            if (formattedSymbol === 'US_STOCKS') {
+                return {
+                    price: state.holdings.find(h => h.symbol === 'US_STOCKS')?.currentPrice || 5646.963,
+                    name: '美股投資組合'
+                };
+            }
+
             if (market === 'HK') {
                 let cleanSym = formattedSymbol.replace('.HK', '');
                 while (cleanSym.length < 4) {
                     cleanSym = '0' + cleanSym;
                 }
                 formattedSymbol = cleanSym + '.HK';
-            } else {
-                if (formattedSymbol === 'NVIDIA') formattedSymbol = 'NVDA';
             }
 
             const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${formattedSymbol}?interval=1d&range=1d`;
