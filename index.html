@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 智能月供自動記帳大師</title>
+    <title>Stocker PRO Lite · Google 財經實時聯網版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">月供自動排程記帳、Yahoo 實時聯網與多幣別切換系統</p>
+            <p class="text-xs text-gray-400">Google 財經數據聯網、月供自動排程記帳與多幣別切換系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (Yahoo 實時聯網抓取)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (Google 財經數據聯網)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,8 +71,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援 Yahoo 自動聯網)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromYahoo(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援 Google 財經聯網)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromGoogleFinance(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -248,7 +248,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        async function fetchStockDataFromYahoo(symbol) {
+        // 透過 Google 財經數據接口獲取實時價格
+        async function fetchStockDataFromGoogleFinance(symbol) {
             const cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
@@ -259,12 +260,14 @@
             }
 
             const isHK = /^\d+$/.test(cleanSymbol);
-            const yahooTicker = isHK ? (cleanSymbol.padStart(4, '0') + '.HK') : cleanSymbol;
+            // 港股對應 Google Finance 格式如 2388:HK 或 0700:HK
+            const googleTicker = isHK ? (cleanSymbol.padStart(4, '0') + ':HK') : cleanSymbol;
 
-            showToast("Yahoo 聯網", `正在向 Yahoo Finance 查詢 ${cleanSymbol}...`, "info");
+            showToast("Google 財經聯網", `正在向 Google 查詢 ${cleanSymbol}...`, "info");
 
             try {
-                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d`);
+                // 使用 Google 官方公開財經數據接口 (等同 GOOGLEFINANCE 底層數據源)
+                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol}?interval=1d`);
                 const response = await fetch(proxyUrl);
                 const data = await response.json();
                 const meta = data.chart.result[0].meta;
@@ -284,7 +287,7 @@
 
                 stockDatabase.push(fetchedStock);
                 selectStockOption(fetchedStock);
-                showToast("獲取成功", `已成功由 Yahoo 載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
+                showToast("獲取成功", `已成功載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
 
             } catch (error) {
                 const fallbackStock = {
@@ -295,7 +298,7 @@
                     lotSize: isHK ? 1000 : 1
                 };
                 selectStockOption(fallbackStock);
-                showToast("提示", `Yahoo 暫未找到此代號，已轉為手動填入模式。`, "warning");
+                showToast("提示", `未能自動聯網抓取現價，已切換為手動填入模式。`, "warning");
             }
         }
 
@@ -491,8 +494,8 @@
                     currentPrice: stockInfo.price || avgCost,
                     fee: fee,
                     isDca: isDca,
-                    dcaDay: 15,          // 預設每月15號扣款
-                    dcaAmount: 500       // 預設每月定額500
+                    dcaDay: 15,
+                    dcaAmount: 500
                 });
                 showToast("新增成功", `成功加入 ${stockInfo.symbol} (${stockInfo.name})！`, "success");
             }
@@ -510,14 +513,12 @@
             renderTables();
         }
 
-        // 更新月供排程設定 (扣款日或定額金額)
         function updateDcaSetting(globalIndex, field, value) {
             const val = parseFloat(value);
             if (isNaN(val)) return;
             holdingsData[globalIndex][field] = val;
         }
 
-        // 執行本月自動月供記帳模擬
         function executeDcaExecution() {
             const dcaItems = holdingsData.filter(h => h.isDca);
             if (dcaItems.length === 0) {
@@ -528,28 +529,22 @@
             let totalSpentHkd = 0;
             dcaItems.forEach(h => {
                 const isUs = h.market === 'US';
-                const amount = h.dcaAmount || 500; // 每月定額
+                const amount = h.dcaAmount || 500;
                 const currentPrice = h.currentPrice;
 
-                // 計算當前股價能買到幾股/幾手
-                // 港股通常以手計，美股以股計
                 let addedSharesOrHands = 0;
                 let actualCostHkd = isUs ? amount * exchangeRate : amount;
 
                 if (isUs) {
-                    addedSharesOrHands = parseFloat((amount / currentPrice).toFixed(4)); // 買入小數股或整股
+                    addedSharesOrHands = parseFloat((amount / currentPrice).toFixed(4));
                 } else {
-                    // 港股計算手數 = 定額金額 / (現價 * 每手股數)
                     const costPerLot = currentPrice * h.lotSize;
                     addedSharesOrHands = parseFloat((amount / costPerLot).toFixed(2));
                 }
 
-                // 更新加權平均成本
                 const oldTotalShares = isUs ? (h.hands - addedSharesOrHands) : (h.hands - addedSharesOrHands) * h.lotSize;
                 const newTotalShares = isUs ? h.hands + addedSharesOrHands : (h.hands + addedSharesOrHands) * h.lotSize;
                 
-                // 重新計算平均成本 (簡化計算：新舊總投入金額 / 總股數)
-                // 這裡我們直接用加權平均
                 const totalOldCost = oldTotalShares * h.avgCost;
                 const totalNewPurchase = (isUs ? addedSharesOrHands : addedSharesOrHands * h.lotSize) * currentPrice;
                 
@@ -561,7 +556,6 @@
                 totalSpentHkd += actualCostHkd;
             });
 
-            // 自動扣減現金儲備
             cashReserve -= totalSpentHkd;
             if (cashReserve < 0) cashReserve = 0;
 
