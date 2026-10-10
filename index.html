@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 拖曳排序投資大師</title>
+    <title>Stocker PRO Lite · 極速輕量化投資大師</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -11,7 +11,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f3f4f6; }
-        /* 拖曳時的樣式 */
         .dragging { opacity: 0.4; background-color: #1f2937 !important; }
         tr[draggable="true"] { cursor: grab; }
         tr[draggable="true"]:active { cursor: grabbing; }
@@ -23,7 +22,7 @@
     <header class="flex justify-between items-center pb-6 border-b border-gray-800">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">支援滑鼠拖曳排序與自動排版系統</p>
+            <p class="text-xs text-gray-400">輕量化投資組合與動態排版系統</p>
         </div>
         <div class="flex gap-2">
             <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-xl font-bold">基礎貨幣: HKD</span>
@@ -54,17 +53,21 @@
             <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div class="flex items-center gap-2">
                     <i data-lucide="briefcase" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-sm font-bold text-white">當前持股庫存 <span class="text-[10px] text-gray-400 font-normal">(可直接用滑鼠按住整行拖曳排序)</span></h3>
+                    <h3 class="text-sm font-bold text-white">當前持股庫存</h3>
                 </div>
                 
-                <!-- 手動 / 自動排版控制列 -->
-                <div class="flex items-center gap-2">
-                    <div class="flex bg-gray-950 p-1 rounded-xl border border-gray-800 text-xs">
-                        <button id="btn-mode-manual" onclick="setSortMode('manual')" class="px-3 py-1 rounded-lg bg-amber-400 text-gray-950 font-bold transition-all">手動 (可拖曳)</button>
-                        <button id="btn-mode-auto" onclick="setSortMode('auto')" class="px-3 py-1 rounded-lg text-gray-400 transition-all">自動排版</button>
-                    </div>
-                    <button onclick="autoFormatHoldingsTable()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 text-xs font-bold rounded-xl border border-amber-500/20 transition-all flex items-center gap-1">
-                        <i data-lucide="wand-2" class="w-3.5 h-3.5"></i> 一鍵排版
+                <!-- 功能按鈕區：手動排版開關 + 一鍵排版 -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- 手動排版開關 (Toggle Switch) -->
+                    <button id="btn-toggle-manual" onclick="toggleManualSort()" class="px-3 py-1.5 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="lock" id="manual-icon" class="w-3.5 h-3.5"></i>
+                        <span id="manual-text">手動排版: 關閉 (鎖定)</span>
+                    </button>
+
+                    <!-- 一鍵排版按鈕 (市值由高至低) -->
+                    <button onclick="autoFormatHoldingsTable()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 text-xs font-bold rounded-xl border border-amber-500/20 transition-all flex items-center gap-1.5 shadow-sm">
+                        <i data-lucide="wand-2" class="w-3.5 h-3.5"></i>
+                        <span>✨ 一鍵排版</span>
                     </button>
                 </div>
             </div>
@@ -73,7 +76,7 @@
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-950 text-[10px] uppercase text-gray-400 border-b border-gray-800">
                         <tr>
-                            <th class="p-4 w-8 text-center">⠿</th>
+                            <th class="p-4 w-10 text-center">拖曳</th>
                             <th class="p-4">股票代號</th>
                             <th class="p-4">持股量</th>
                             <th class="p-4 text-right">平均成本</th>
@@ -91,7 +94,10 @@
 
     </main>
 
-    <!-- 拖曳排序與核心邏輯 -->
+    <!-- 提示框容器 -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+    <!-- 核心邏輯 -->
     <script>
         lucide.createIcons();
 
@@ -101,29 +107,35 @@
             { symbol: '2016', name: '浙商銀行', shares: 1000, avgCost: 2.24, currentPrice: 2.40 }
         ];
 
-        let sortMode = 'manual'; // 'manual' 或 'auto'
+        let isManualSortEnabled = false; // 預設關閉手動拖曳
         let draggedIndex = null;
 
-        function setSortMode(mode) {
-            sortMode = mode;
-            const manualBtn = document.getElementById('btn-mode-manual');
-            const autoBtn = document.getElementById('btn-mode-auto');
+        // 切換手動排版開關狀態 (ON / OFF)
+        function toggleManualSort() {
+            isManualSortEnabled = !isManualSortEnabled;
+            const btn = document.getElementById('btn-toggle-manual');
+            const icon = document.getElementById('manual-icon');
+            const text = document.getElementById('manual-text');
 
-            if (mode === 'manual') {
-                manualBtn.className = "px-3 py-1 rounded-lg bg-amber-400 text-gray-950 font-bold transition-all";
-                autoBtn.className = "px-3 py-1 rounded-lg text-gray-400 transition-all";
-                renderTable(); // 重新渲染以恢復可拖曳屬性
+            if (isManualSortEnabled) {
+                btn.className = "px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-400 text-gray-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md";
+                icon.setAttribute('data-lucide', 'unlock');
+                text.textContent = "手動排版: 開啟 (可拖曳)";
+                showToast("手動模式", "已開啟！你而家可以直接用滑鼠按住整行上下拖曳調整順序。", "success");
             } else {
-                autoBtn.className = "px-3 py-1 rounded-lg bg-amber-400 text-gray-950 font-bold transition-all";
-                manualBtn.className = "px-3 py-1 rounded-lg text-gray-400 transition-all";
-                autoFormatHoldingsTable();
+                btn.className = "px-3 py-1.5 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm";
+                icon.setAttribute('data-lucide', 'lock');
+                text.textContent = "手動排版: 關閉 (鎖定)";
+                showToast("手動模式", "已鎖定！表格順序已固定。", "info");
             }
+            renderTable();
         }
 
-        // 自動排版（市值由大到小）
+        // 一鍵排版：直接按市值由大到小排序
         function autoFormatHoldingsTable() {
             holdingsData.sort((a, b) => (b.shares * b.currentPrice) - (a.shares * a.currentPrice));
             renderTable();
+            showToast("一鍵排版", "已自動按市值由高至低重新排列完成！", "success");
         }
 
         function renderTable() {
@@ -141,12 +153,11 @@
                 const tr = document.createElement('tr');
                 tr.className = (index % 2 === 0 ? "bg-gray-900/40" : "bg-gray-950/20") + " hover:bg-gray-800/40 transition-colors";
                 
-                // 只有在手動模式下才允許拖曳
-                if (sortMode === 'manual') {
+                // 只有當手動開關開啟時，表格行才支援滑鼠拖曳
+                if (isManualSortEnabled) {
                     tr.setAttribute('draggable', 'true');
                     tr.dataset.index = index;
 
-                    // 綁定拖曳事件
                     tr.addEventListener('dragstart', handleDragStart);
                     tr.addEventListener('dragover', handleDragOver);
                     tr.addEventListener('drop', handleDrop);
@@ -154,7 +165,7 @@
                 }
 
                 tr.innerHTML = `
-                    <td class="p-4 text-center text-gray-600 cursor-grab">${sortMode === 'manual' ? '⠿' : '•'}</td>
+                    <td class="p-4 text-center text-gray-500">${isManualSortEnabled ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
                     <td class="p-4 font-bold text-white">${h.symbol}<br><span class="text-[10px] text-gray-400">${h.name}</span></td>
                     <td class="p-4">${h.shares} 股</td>
                     <td class="p-4 text-right">HK$ ${h.avgCost.toFixed(2)}</td>
@@ -171,7 +182,7 @@
             lucide.createIcons();
         }
 
-        // --- 拖曳事件處理函數 ---
+        // 拖曳事件處理
         function handleDragStart(e) {
             draggedIndex = parseInt(this.dataset.index);
             this.classList.add('dragging');
@@ -179,7 +190,7 @@
         }
 
         function handleDragOver(e) {
-            e.preventDefault(); // 必須阻止預設行為才能觸發 drop
+            e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
         }
 
@@ -189,7 +200,6 @@
 
             if (isNaN(draggedIndex) || isNaN(targetIndex) || draggedIndex === targetIndex) return;
 
-            // 調整陣列順序
             const movedItem = holdingsData.splice(draggedIndex, 1)[0];
             holdingsData.splice(targetIndex, 0, movedItem);
 
@@ -201,7 +211,16 @@
             draggedIndex = null;
         }
 
-        // 初始化
+        // Toast 提示函數
+        function showToast(title, text, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = "p-3.5 rounded-xl shadow-2xl border bg-gray-900 border-gray-700 text-white text-xs flex items-center gap-2 animate-bounce-short";
+            toast.innerHTML = `<strong class="${type === 'success' ? 'text-emerald-400' : 'text-amber-400'}">${title}:</strong> <span>${text}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
         window.onload = function() {
             renderTable();
         };
