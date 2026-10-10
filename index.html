@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 智能選股與手續費大師</title>
+    <title>Stocker PRO Lite · 老虎證券智能手續費大師</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex justify-between items-center pb-6 border-b border-gray-800">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">智能代號識別、手續費管理與動態排版系統</p>
+            <p class="text-xs text-gray-400">老虎證券智能費率計算與港美股動態管理系統</p>
         </div>
         <div class="flex gap-2">
             <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-xl font-bold">基礎貨幣: HKD</span>
@@ -48,42 +48,37 @@
             </div>
         </div>
 
-        <!-- 新增股票輸入表單卡片 (支援代號自動聯想下拉選單與手續費) -->
+        <!-- 新增股票輸入表單卡片 -->
         <div class="bg-gradient-to-br from-gray-900 to-gray-950 p-5 rounded-2xl border border-amber-500/30 shadow-xl space-y-4">
-            <div class="border-b border-gray-800 pb-2 flex items-center gap-2">
-                <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (輸入代號自動識別)</h3>
+            <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (老虎證券費率自動試算)</h3>
+                </div>
+                <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
             
-            <form onsubmit="handleAddStock(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 mb-1">交易市場</label>
-                    <select id="input-market" onchange="onMarketSelectionChange()" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
-                        <option value="HK">🇭🇰 港股 (HKD)</option>
-                        <option value="US">🇺🇸 美股 (USD)</option>
-                    </select>
-                </div>
-
-                <!-- 股票代號與動態下拉選單容器 -->
+            <form onsubmit="handleAddStock(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                <!-- 股票代號輸入框 -->
                 <div class="relative">
-                    <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (自動辨識名稱)</label>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (純數=港股 / 英文=美股)</label>
                     <input type="text" id="input-symbol" oninput="handleSymbolInput(this.value)" placeholder="例: 2388 或 AAPL" autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                     
-                    <!-- 多結果下拉選單 -->
+                    <!-- 美股下拉選單 -->
                     <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-850 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-48 overflow-y-auto"></div>
                 </div>
 
                 <div>
-                    <label class="block text-[10px] font-bold text-gray-400 mb-1">持股數量</label>
-                    <input type="number" step="any" id="input-shares" placeholder="例: 500" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1" id="label-shares">持股數量 / 手數</label>
+                    <input type="number" step="any" id="input-shares" oninput="calculateTigerFee()" placeholder="港股輸入手數 / 美股輸股數" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 mb-1">平均成本</label>
-                    <input type="number" step="any" id="input-cost" placeholder="例: 37.0" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <input type="number" step="any" id="input-cost" oninput="calculateTigerFee()" placeholder="例: 37.0" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-gray-400 mb-1">手續費 / 佣金</label>
-                    <input type="number" step="any" id="input-fee" placeholder="例: 15.0" value="0" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">手續費 / 佣金 (老虎自動算，可修改)</label>
+                    <input type="number" step="any" id="input-fee" placeholder="老虎手續費" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
                     <button type="submit" class="w-full py-2.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-1">
@@ -98,7 +93,7 @@
             <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-950/30">
                 <div class="flex items-center gap-2">
                     <span class="text-base">🇭🇰</span>
-                    <h3 class="text-sm font-bold text-white">港股持倉名單</h3>
+                    <h3 class="text-sm font-bold text-white">港股持倉名單 (一手手單位)</h3>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="btn-toggle-hk" onclick="toggleManualSort('HK')" class="px-3 py-1.5 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 text-xs font-bold transition-all flex items-center gap-1.5">
@@ -117,7 +112,7 @@
                         <tr>
                             <th class="p-4 w-10 text-center">拖曳</th>
                             <th class="p-4">代號 / 名稱</th>
-                            <th class="p-4">持股量</th>
+                            <th class="p-4">持股手數 (每手股數)</th>
                             <th class="p-4 text-right">平均成本 (HKD)</th>
                             <th class="p-4 text-right">實時現價 (HKD)</th>
                             <th class="p-4 text-right">市值</th>
@@ -154,7 +149,7 @@
                         <tr>
                             <th class="p-4 w-10 text-center">拖曳</th>
                             <th class="p-4">代號 / 名稱</th>
-                            <th class="p-4">持股量</th>
+                            <th class="p-4">持股數量</th>
                             <th class="p-4 text-right">平均成本 (USD)</th>
                             <th class="p-4 text-right">實時現價 (USD)</th>
                             <th class="p-4 text-right">市值 (折合HKD)</th>
@@ -175,128 +170,178 @@
     <script>
         lucide.createIcons();
 
-        // 預設股票資料庫（供自動識別名稱與現價參考）
         const stockDatabase = [
-            { symbol: '2388', name: '中銀香港', market: 'HK', price: 47.94 },
-            { symbol: '0700', name: '騰訊控股', market: 'HK', price: 380.0 },
-            { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0 },
-            { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0 },
-            { symbol: '1211', name: '比亞迪股份', market: 'HK', price: 240.0 },
-            { symbol: '2282', name: '美高梅中國', market: 'HK', price: 10.75 },
-            { symbol: '2016', name: '浙商銀行', market: 'HK', price: 2.40 },
-            { symbol: 'AAPL', name: '蘋果公司 (Apple)', market: 'US', price: 220.50 },
-            { symbol: 'TSLA', name: '特斯拉 (Tesla)', market: 'US', price: 245.00 },
-            { symbol: 'NVDA', name: '英偉達 (NVIDIA)', market: 'US', price: 125.00 },
-            { symbol: 'MSFT', name: '微軟 (Microsoft)', market: 'US', price: 420.00 },
-            { symbol: 'VOO', name: '標普500 ETF (Vanguard)', market: 'US', price: 510.00 },
-            { symbol: 'QQQ', name: '納指100 ETF (Invesco)', market: 'US', price: 480.00 }
+            { symbol: '2388', name: '中銀香港', market: 'HK', price: 47.94, lotSize: 500 },
+            { symbol: '0700', name: '騰訊控股', market: 'HK', price: 380.0, lotSize: 100 },
+            { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0, lotSize: 100 },
+            { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 },
+            { symbol: '1211', name: '比亞迪股份', market: 'HK', price: 240.0, lotSize: 500 },
+            { symbol: '2282', name: '美高梅中國', market: 'HK', price: 10.75, lotSize: 1000 },
+            { symbol: '2016', name: '浙商銀行', market: 'HK', price: 2.40, lotSize: 1000 },
+            { symbol: 'AAPL', name: '蘋果公司 (Apple)', market: 'US', price: 220.50, lotSize: 1 },
+            { symbol: 'TSLA', name: '特斯拉 (Tesla)', market: 'US', price: 245.00, lotSize: 1 },
+            { symbol: 'NVDA', name: '英偉達 (NVIDIA)', market: 'US', price: 125.00, lotSize: 1 },
+            { symbol: 'MSFT', name: '微軟 (Microsoft)', market: 'US', price: 420.00, lotSize: 1 },
+            { symbol: 'VOO', name: '標普500 ETF (Vanguard)', market: 'US', price: 510.00, lotSize: 1 },
+            { symbol: 'QQQ', name: '納指100 ETF (Invesco)', market: 'US', price: 480.00, lotSize: 1 }
         ];
 
         let holdingsData = [
-            { symbol: '2388', name: '中銀香港', market: 'HK', shares: 500, avgCost: 37.00, currentPrice: 47.94, fee: 15.0 },
-            { symbol: '2282', name: '美高梅中國', market: 'HK', shares: 1000, avgCost: 10.63, currentPrice: 10.75, fee: 15.0 },
-            { symbol: 'AAPL', name: '蘋果公司 (Apple)', market: 'US', shares: 25, avgCost: 175.00, currentPrice: 220.50, fee: 1.00 }
+            { symbol: '2388', name: '中銀香港', market: 'HK', hands: 1, lotSize: 500, avgCost: 37.00, currentPrice: 47.94, fee: 33.5 },
+            { symbol: '2282', name: '美高梅中國', market: 'HK', hands: 1, lotSize: 1000, avgCost: 10.63, currentPrice: 10.75, fee: 31.4 },
+            { symbol: 'AAPL', name: '蘋果公司 (Apple)', market: 'US', hands: 25, lotSize: 1, avgCost: 175.00, currentPrice: 220.50, fee: 1.99 }
         ];
 
         const exchangeRate = 7.8;
         let manualSortStates = { HK: false, US: false };
         let draggedIndex = null;
         let draggedMarket = null;
-        let selectedStockName = '';
+        let activeInputStock = null;
 
-        // 當輸入股票代號時觸發：自動匹配資料庫，若有多個結果生成下拉選單
+        // 老虎證券手續費自動計算函數
+        function calculateTigerFee() {
+            const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
+            const sharesInput = parseFloat(document.getElementById('input-shares').value) || 0;
+            const costInput = parseFloat(document.getElementById('input-cost').value) || 0;
+
+            if (!symbolInput || sharesInput <= 0 || costInput <= 0) return;
+
+            const isHK = /^\d+$/.test(symbolInput);
+            const lotSize = activeInputStock ? activeInputStock.lotSize : (isHK ? 1000 : 1);
+            const totalShares = isHK ? sharesInput * lotSize : sharesInput;
+            const totalTurnover = totalShares * costInput;
+
+            let estimatedFee = 0;
+
+            if (isHK) {
+                // 老虎港股：佣金(0.03%, 最低15) + 平台費(15) + 交易費/徵費/印花稅(約0.13%)
+                const commission = Math.max(15, totalTurnover * 0.0003);
+                const platform = 15;
+                const regulatory = totalTurnover * 0.00133;
+                estimatedFee = commission + platform + regulatory;
+            } else {
+                // 老虎美股：佣金($0.0049/股, 最低$0.99) + 平台費($0.005/股, 最低$1.00) + 規費
+                const commission = Math.max(0.99, totalShares * 0.0049);
+                const platform = Math.max(1.00, totalShares * 0.005);
+                estimatedFee = commission + platform + 0.50; // 包含基礎規費
+            }
+
+            document.getElementById('input-fee').value = estimatedFee.toFixed(2);
+        }
+
         function handleSymbolInput(query) {
-            const market = document.getElementById('input-market').value;
-            const dropdown = document.getElementById('symbol-dropdown');
             const cleanQuery = query.toUpperCase().trim();
+            const dropdown = document.getElementById('symbol-dropdown');
+            const marketBadge = document.getElementById('input-market-badge');
+            const sharesLabel = document.getElementById('label-shares');
 
             if (!cleanQuery) {
                 dropdown.classList.add('hidden');
                 dropdown.innerHTML = '';
-                selectedStockName = '';
+                marketBadge.textContent = '等待輸入代號...';
+                marketBadge.className = 'text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold';
+                activeInputStock = null;
                 return;
             }
 
-            // 過濾符合市場與代號/名稱的股票
-            const matches = stockDatabase.filter(s => 
-                s.market === market && (s.symbol.includes(cleanQuery) || s.name.toUpperCase().includes(cleanQuery))
-            );
+            const isPureNumbers = /^\d+$/.test(cleanQuery);
 
-            if (matches.length > 0) {
-                dropdown.innerHTML = '';
-                dropdown.classList.remove('hidden');
-
-                matches.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = "px-3.5 py-2.5 hover:bg-gray-755 cursor-pointer text-xs text-gray-200 border-b border-gray-750/50 flex justify-between items-center";
-                    div.innerHTML = `<span><strong class="text-amber-400 font-mono">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">參考價: ${item.price}</span>`;
-                    div.onclick = () => selectStockOption(item);
-                    dropdown.appendChild(div);
-                });
-            } else {
+            if (isPureNumbers) {
+                marketBadge.textContent = '🇭🇰 港股 (老虎費率試算)';
+                marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
+                sharesLabel.textContent = '持股手數 (一手單位)';
                 dropdown.classList.add('hidden');
-                dropdown.innerHTML = '';
-                selectedStockName = cleanQuery; // 自定義新股票名稱
+
+                const found = stockDatabase.find(s => s.market === 'HK' && s.symbol === cleanQuery);
+                if (found) {
+                    document.getElementById('input-cost').value = found.price;
+                    activeInputStock = found;
+                } else {
+                    activeInputStock = { symbol: cleanQuery, name: `港股 ${cleanQuery}`, market: 'HK', price: 10.0, lotSize: 1000 };
+                }
+            } else {
+                marketBadge.textContent = '🇺🇸 美股 (請選擇標的)';
+                marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
+                sharesLabel.textContent = '持股數量 (股)';
+
+                const matches = stockDatabase.filter(s => s.market === 'US' && (s.symbol.includes(cleanQuery) || s.name.toUpperCase().includes(cleanQuery)));
+
+                if (matches.length > 0) {
+                    dropdown.innerHTML = '';
+                    dropdown.classList.remove('hidden');
+                    matches.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = "px-3.5 py-2.5 hover:bg-gray-700 cursor-pointer text-xs text-gray-200 border-b border-gray-750 flex justify-between items-center";
+                        div.innerHTML = `<span><strong class="text-blue-400 font-mono">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">參考價: $${item.price}</span>`;
+                        div.onclick = () => selectStockOption(item);
+                        dropdown.appendChild(div);
+                    });
+                } else {
+                    dropdown.classList.add('hidden');
+                    activeInputStock = { symbol: cleanQuery, name: cleanQuery, market: 'US', price: 100.0, lotSize: 1 };
+                }
             }
+            calculateTigerFee();
         }
 
         function selectStockOption(item) {
             document.getElementById('input-symbol').value = item.symbol;
             document.getElementById('input-cost').value = item.price;
-            selectedStockName = item.name;
+            activeInputStock = item;
             document.getElementById('symbol-dropdown').classList.add('hidden');
-            showToast("智能辨識", `已自動載入 ${item.name} 參考現價。`, "success");
+            calculateTigerFee();
+            showToast("智能辨識", `已選定美股 ${item.name}。`, "success");
         }
 
-        function onMarketSelectionChange() {
-            document.getElementById('input-symbol').value = '';
-            document.getElementById('symbol-dropdown').classList.add('hidden');
-            selectedStockName = '';
-        }
-
-        // 點擊其他地方關閉下拉選單
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#input-symbol') && !e.target.closest('#symbol-dropdown')) {
                 document.getElementById('symbol-dropdown').classList.add('hidden');
             }
         });
 
-        // 處理新增股票
         function handleAddStock(e) {
             e.preventDefault();
-            const market = document.getElementById('input-market').value;
-            const symbol = document.getElementById('input-symbol').value.toUpperCase().trim();
-            const shares = parseFloat(document.getElementById('input-shares').value);
+            const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
+            const inputVal = parseFloat(document.getElementById('input-shares').value);
             const avgCost = parseFloat(document.getElementById('input-cost').value);
             const fee = parseFloat(document.getElementById('input-fee').value) || 0;
 
-            if (!symbol || isNaN(shares) || isNaN(avgCost)) {
-                showToast("輸入錯誤", "請填寫有效的股票代號與數值！", "error");
+            if (!symbolInput || isNaN(inputVal) || isNaN(avgCost)) {
+                showToast("輸入錯誤", "請填寫完整的代號與數值！", "error");
                 return;
             }
 
-            const name = selectedStockName || symbol;
-            const existing = holdingsData.find(h => h.symbol === symbol && h.market === market);
+            const market = /^\d+$/.test(symbolInput) ? 'HK' : 'US';
+            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: avgCost, lotSize: 1000 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: avgCost, lotSize: 1 });
+
+            const existing = holdingsData.find(h => h.symbol === stockInfo.symbol && h.market === market);
 
             if (existing) {
-                existing.shares += shares;
-                existing.avgCost = ((existing.shares - shares) * existing.avgCost + shares * avgCost) / existing.shares;
+                existing.hands += inputVal;
+                existing.avgCost = ((existing.hands - inputVal) * existing.avgCost + inputVal * avgCost) / existing.hands;
                 existing.fee += fee;
-                showToast("持股已合併", `已自動將新買入的 ${shares} 股合拼入現有 ${symbol} 中。`, "success");
+                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.symbol} 中。`, "success");
             } else {
-                const dbMatch = stockDatabase.find(s => s.symbol === symbol && s.market === market);
                 holdingsData.push({
-                    symbol, name, market, shares, avgCost, currentPrice: dbMatch ? dbMatch.price : avgCost, fee
+                    symbol: stockInfo.symbol,
+                    name: stockInfo.name,
+                    market: market,
+                    hands: inputVal,
+                    lotSize: stockInfo.lotSize || 1,
+                    avgCost: avgCost,
+                    currentPrice: stockInfo.price || avgCost,
+                    fee: fee
                 });
-                showToast("新增成功", `成功加入 ${symbol} (${name})！`, "success");
+                showToast("新增成功", `成功加入 ${stockInfo.symbol} (${stockInfo.name})！`, "success");
             }
 
-            // 重置表單
             document.getElementById('input-symbol').value = '';
             document.getElementById('input-shares').value = '';
             document.getElementById('input-cost').value = '';
-            document.getElementById('input-fee').value = '0';
-            selectedStockName = '';
+            document.getElementById('input-fee').value = '';
+            document.getElementById('input-market-badge').textContent = '等待輸入代號...';
+            document.getElementById('input-market-badge').className = 'text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold';
+            activeInputStock = null;
 
             renderTables();
         }
@@ -312,7 +357,7 @@
                 btn.className = "px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-400 text-gray-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md";
                 icon.setAttribute('data-lucide', 'unlock');
                 text.textContent = "手動排版: 開啟 (可拖曳)";
-                showToast("手動模式", `${market === 'HK' ? '港股' : '美股'}已解鎖！可直接拖曳排序。`, "success");
+                showToast("手動模式", `${market === 'HK' ? '港股' : '美股'}已解鎖！`, "success");
             } else {
                 btn.className = "px-3 py-1.5 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm";
                 icon.setAttribute('data-lucide', 'lock');
@@ -325,18 +370,21 @@
         function autoFormatTable(market) {
             const list = holdingsData.filter(h => h.market === market);
             list.sort((a, b) => {
-                const valA = a.shares * a.currentPrice * (market === 'US' ? exchangeRate : 1);
-                const valB = b.shares * b.currentPrice * (market === 'US' ? exchangeRate : 1);
+                const totalSharesA = a.market === 'HK' ? a.hands * a.lotSize : a.hands;
+                const totalSharesB = b.market === 'HK' ? b.hands * b.lotSize : b.hands;
+                const valA = totalSharesA * a.currentPrice * (market === 'US' ? exchangeRate : 1);
+                const valB = totalSharesB * b.currentPrice * (market === 'US' ? exchangeRate : 1);
                 return valB - valA;
             });
             holdingsData = [...holdingsData.filter(h => h.market !== market), ...list];
             renderTables();
-            showToast("一鍵排版", `${market === 'HK' ? '港股' : '美股'}已按市值由高至低重新排序！`, "success");
+            showToast("一鍵排版", `${market === 'HK' ? '港股' : '美股'}已按市值排序！`, "success");
         }
 
         function adjustShares(globalIndex) {
             const h = holdingsData[globalIndex];
-            const input = prompt(`請輸入 ${h.symbol} (${h.name}) 要變動的股數：\n（正數增加，負數減少）`, "100");
+            const unitName = h.market === 'HK' ? '手數' : '股數';
+            const input = prompt(`請輸入 ${h.symbol} 要變動的${unitName}：\n（正數增加，負數減少）`, "1");
             if (input === null) return;
             const delta = parseFloat(input);
 
@@ -345,23 +393,23 @@
                 return;
             }
 
-            h.shares += delta;
-            if (h.shares <= 0) {
+            h.hands += delta;
+            if (h.hands <= 0) {
                 if (confirm(`持股已歸零，是否將 ${h.symbol} 從名單中【剷除】？`)) {
                     holdingsData.splice(globalIndex, 1);
                     showToast("已剷除", `${h.symbol} 已移除。`, "success");
                 } else {
-                    h.shares = 0;
+                    h.hands = 0;
                 }
             } else {
-                showToast("調整成功", `${h.symbol} 現有持股: ${h.shares} 股`, "success");
+                showToast("調整成功", `${h.symbol} 現有持股: ${h.hands} ${h.market === 'HK' ? '手' : '股'}`, "success");
             }
             renderTables();
         }
 
         function deleteHolding(globalIndex) {
             const h = holdingsData[globalIndex];
-            if (confirm(`確定要將 ${h.symbol} (${h.name}) 徹底【剷除】嗎？`)) {
+            if (confirm(`確定要將 ${h.symbol} 徹底【剷除】嗎？`)) {
                 holdingsData.splice(globalIndex, 1);
                 renderTables();
                 showToast("已剷除", `${h.symbol} 已刪除。`, "success");
@@ -378,11 +426,12 @@
 
             holdingsData.forEach((h, globalIndex) => {
                 const isUs = h.market === 'US';
-                const marketValRaw = h.shares * h.currentPrice;
+                const actualShares = isUs ? h.hands : h.hands * h.lotSize;
+                const marketValRaw = actualShares * h.currentPrice;
                 const marketValHkd = isUs ? marketValRaw * exchangeRate : marketValRaw;
-                const costValHkd = isUs ? (h.shares * h.avgCost) * exchangeRate : (h.shares * h.avgCost);
+                const costValHkd = isUs ? (actualShares * h.avgCost) * exchangeRate : (actualShares * h.avgCost);
                 const pnlHkd = marketValHkd - costValHkd - (isUs ? h.fee * exchangeRate : h.fee);
-                const pnlRaw = marketValRaw - (h.shares * h.avgCost) - h.fee;
+                const pnlRaw = marketValRaw - (actualShares * h.avgCost) - h.fee;
 
                 totalEquityHkd += marketValHkd;
 
@@ -404,8 +453,10 @@
                 tr.innerHTML = `
                     <td class="p-4 text-center text-gray-500">${isManualActive ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
                     <td class="p-4 font-bold text-white">${h.symbol}<br><span class="text-[10px] text-gray-400">${h.name}</span></td>
-                    <td class="p-4 font-mono font-bold text-amber-300">${h.shares.toLocaleString()} 股</td>
-                    <td class="p-4 text-right font-mono">${isUs ? 'US$ ' : 'HK$ '}${h.avgCost.toFixed(2)}<br><span class='text-[9px] text-gray-500'>手續費: ${h.fee}</span></td>
+                    <td class="p-4 font-mono font-bold text-amber-300">
+                        ${isUs ? `${h.hands.toLocaleString()} 股` : `${h.hands} 手 <span class='text-[10px] text-gray-400'>(共 ${actualShares.toLocaleString()} 股)</span>`}
+                    </td>
+                    <td class="p-4 text-right font-mono">${isUs ? 'US$ ' : 'HK$ '}${h.avgCost.toFixed(2)}<br><span class='text-[9px] text-gray-500'>費: ${h.fee.toFixed(2)}</span></td>
                     <td class="p-4 text-right font-mono font-bold text-emerald-400">${isUs ? 'US$ ' : 'HK$ '}${h.currentPrice.toFixed(2)}</td>
                     <td class="p-4 text-right font-mono font-bold">${isUs ? `US$ ${marketValRaw.toFixed(2)}<br><span class='text-[9px] text-gray-400'>≈ HK$ ${marketValHkd.toFixed(2)}</span>` : `HK$ ${marketValHkd.toFixed(2)}`}</td>
                     <td class="p-4 text-right font-mono ${pnlHkd >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
