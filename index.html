@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 港美股智能月供管理系統</title>
+    <title>Stocker PRO Lite · 專業 Yahoo 實時聯網版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">港美股智能搜尋、月供標記、老虎證券費率試算與多幣別切換系統</p>
+            <p class="text-xs text-gray-400">Yahoo 實時聯網、月供標記、老虎證券費率試算與多幣別切換系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,16 +63,16 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (Yahoo 實時聯網抓取)</h3>
                 </div>
-                <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待選擇代號...</span>
+                <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
             
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援中英文模糊搜尋)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromAPI(this.value)" placeholder="輸入代號..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援 Yahoo 自動聯網)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromYahoo(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -198,7 +198,8 @@
             { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0, lotSize: 100 },
             { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 },
             { symbol: 'AAPL', name: '蘋果公司', market: 'US', price: 220.50, lotSize: 1 },
-            { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 }
+            { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 },
+            { symbol: 'SNDK', name: 'SanDisk', market: 'US', price: 75.00, lotSize: 1 }
         ];
 
         let holdingsData = [];
@@ -207,7 +208,8 @@
         let draggedMarket = null;
         let activeInputStock = null;
 
-        async function fetchStockDataFromAPI(symbol) {
+        // 直接透過 Yahoo Finance 實時聯網抓取數據
+        async function fetchStockDataFromYahoo(symbol) {
             const cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
@@ -220,10 +222,12 @@
             const isHK = /^\d+$/.test(cleanSymbol);
             const yahooTicker = isHK ? (cleanSymbol.padStart(4, '0') + '.HK') : cleanSymbol;
 
-            showToast("聯網查詢", `正在尋找 ${cleanSymbol} 實時數據...`, "info");
+            showToast("Yahoo 聯網", `正在向 Yahoo Finance 查詢 ${cleanSymbol}...`, "info");
 
             try {
-                const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d`);
+                // 使用跨域代理或直接調用 Yahoo 公開圖表 API
+                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?interval=1d`);
+                const response = await fetch(proxyUrl);
                 const data = await response.json();
                 const meta = data.chart.result[0].meta;
 
@@ -242,9 +246,10 @@
 
                 stockDatabase.push(fetchedStock);
                 selectStockOption(fetchedStock);
-                showToast("獲取成功", `已成功聯網載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
+                showToast("獲取成功", `已成功由 Yahoo 載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
 
             } catch (error) {
+                console.warn("Yahoo 聯網失敗，切換為手動填入", error);
                 const fallbackStock = {
                     symbol: cleanSymbol,
                     name: cleanSymbol,
@@ -253,7 +258,7 @@
                     lotSize: isHK ? 1000 : 1
                 };
                 selectStockOption(fallbackStock);
-                showToast("提示", `未能自動聯網抓取現價，請手動填入成本價。`, "warning");
+                showToast("提示", `Yahoo 暫未找到此代號，已轉為手動填入模式。`, "warning");
             }
         }
 
@@ -421,7 +426,7 @@
             const inputVal = parseFloat(document.getElementById('input-shares').value);
             const avgCost = parseFloat(document.getElementById('input-cost').value);
             const fee = parseFloat(document.getElementById('input-fee').value) || 0;
-            const isDca = document.getElementById('input-is-dca').checked; // 是否月供
+            const isDca = document.getElementById('input-is-dca').checked;
 
             if (!symbolInput || isNaN(inputVal) || isNaN(avgCost)) {
                 showToast("輸入錯誤", "請填寫完整代號與數值！", "error");
@@ -437,7 +442,7 @@
                 existing.hands += inputVal;
                 existing.avgCost = ((existing.hands - inputVal) * existing.avgCost + inputVal * avgCost) / existing.hands;
                 existing.fee += fee;
-                existing.isDca = isDca || existing.isDca; // 如果其中一次係月供，保持月供狀態
+                existing.isDca = isDca || existing.isDca;
                 showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.symbol} 中。`, "success");
             } else {
                 holdingsData.push({
