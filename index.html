@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 轉折點一 (補紀錄與手續費升級版)</title>
+    <title>Stocker PRO Lite · 轉折點一 (補單互動與日期升級版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -234,6 +234,62 @@
 
     </main>
 
+    <!-- 🌟 自訂互動補單 Modal 視窗 -->
+    <div id="append-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span>📝</span> 補錄交易紀錄 (<span id="modal-stock-title" class="text-amber-400"></span>)
+                </h3>
+                <button onclick="closeAppendModal()" class="text-gray-400 hover:text-white font-bold text-sm">✕</button>
+            </div>
+
+            <div class="space-y-3">
+                <!-- 操作類型按鈕選擇 -->
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">交易類型</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="type-buy-btn" onclick="setAppendType('BUY')" class="py-2 rounded-xl text-xs font-bold transition-all bg-emerald-500 text-gray-950 shadow-md flex items-center justify-center gap-1">
+                            🟢 加倉 (買入)
+                        </button>
+                        <button type="button" id="type-sell-btn" onclick="setAppendType('SELL')" class="py-2 rounded-xl text-xs font-bold transition-all bg-gray-800 text-gray-400 border border-gray-700 flex items-center justify-center gap-1">
+                            🔴 減倉 (賣出)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 交易日期 -->
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">交易日期</label>
+                    <input type="date" id="modal-date" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <!-- 數量 / 手數 -->
+                <div>
+                    <label class="block text-[10px] font-bold text-amber-400 mb-1" id="modal-qty-label">變動手數 / 股數</label>
+                    <input type="number" step="any" id="modal-qty" placeholder="請輸入數量" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <!-- 成交價格 (減倉時可選填或參考現價) -->
+                <div id="modal-price-container">
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">成交單價</label>
+                    <input type="number" step="any" id="modal-price" placeholder="成交單價" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                </div>
+
+                <!-- 手續費 -->
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 mb-1">手續費 / 佣金</label>
+                    <input type="number" step="any" id="modal-fee" value="15" placeholder="手續費" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400">
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeAppendModal()" class="w-1/2 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl transition-all">取消</button>
+                <button onclick="confirmAppendTransaction()" class="w-1/2 py-2.5 bg-amber-400 hover:bg-amber-500 text-gray-950 text-xs font-bold rounded-xl transition-all shadow-md">確認送出補單</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
 
     <script>
@@ -251,6 +307,10 @@
         let draggedCategory = null;
         let activeInputStock = null;
         let editingIndex = -1;
+        
+        // 補單 Modal 專屬狀態
+        let currentAppendIndex = null;
+        let currentAppendType = 'BUY'; // 'BUY' 或 'SELL'
 
         function updateProgress(percent, text, isSuccess = true) {
             const container = document.getElementById('search-progress-container');
@@ -580,67 +640,107 @@
             showToast("一鍵排版", `該表格已按市值排序！`, "success");
         }
 
-        // 🌟 補紀錄功能：倉內加倉/減倉
-        function appendTransaction(globalIndex) {
+        // 🌟 彈出互動補單視窗
+        function openAppendModal(globalIndex) {
+            currentAppendIndex = globalIndex;
             const h = holdingsData[globalIndex];
-            const unitName = h.market === 'HK' ? '手數' : '股數';
             
-            const mode = prompt(`請選擇操作類型：\n輸入「1」: 加倉 (買入加碼)\n輸入「2」: 減倉 (賣出減持)`, "1");
-            if (!mode) return;
+            document.getElementById('modal-stock-title').textContent = `${h.name} (${h.symbol})`;
+            document.getElementById('modal-qty').value = '';
+            document.getElementById('modal-price').value = (typeof h.currentPrice === 'number' ? h.currentPrice : h.avgCost);
+            document.getElementById('modal-fee').value = '15';
+            
+            // 預設填入今天日期
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('modal-date').value = today;
 
-            if (mode === "1") {
-                // 加倉邏輯
-                const addQty = parseFloat(prompt(`請輸入加倉的 ${unitName}：`, "1"));
-                const addPrice = parseFloat(prompt(`請輸入買入單價：`, h.currentPrice || h.avgCost));
-                const addFee = parseFloat(prompt(`請輸入本次加倉手續費：`, "15")) || 0;
+            setAppendType('BUY');
+            document.getElementById('append-modal').classList.remove('hidden');
+        }
 
-                if (isNaN(addQty) || isNaN(addPrice) || addQty <= 0) {
-                    showToast("錯誤", "無效的數值輸入！", "error");
+        function closeAppendModal() {
+            document.getElementById('append-modal').classList.add('hidden');
+            currentAppendIndex = null;
+        }
+
+        function setAppendType(type) {
+            currentAppendType = type;
+            const buyBtn = document.getElementById('type-buy-btn');
+            const sellBtn = document.getElementById('type-sell-btn');
+            const qtyLabel = document.getElementById('modal-qty-label');
+            const h = currentAppendIndex !== null ? holdingsData[currentAppendIndex] : null;
+            const unitName = h && h.market === 'HK' ? '手數' : '股數';
+
+            if (type === 'BUY') {
+                buyBtn.className = "py-2 rounded-xl text-xs font-bold transition-all bg-emerald-500 text-gray-950 shadow-md flex items-center justify-center gap-1";
+                sellBtn.className = "py-2 rounded-xl text-xs font-bold transition-all bg-gray-800 text-gray-400 border border-gray-700 flex items-center justify-center gap-1";
+                qtyLabel.textContent = `買入增持 ${unitName}`;
+                document.getElementById('modal-price-container').style.display = 'block';
+            } else {
+                sellBtn.className = "py-2 rounded-xl text-xs font-bold transition-all bg-rose-500 text-white shadow-md flex items-center justify-center gap-1";
+                buyBtn.className = "py-2 rounded-xl text-xs font-bold transition-all bg-gray-800 text-gray-400 border border-gray-700 flex items-center justify-center gap-1";
+                qtyLabel.textContent = `賣出減持 ${unitName}`;
+                document.getElementById('modal-price-container').style.display = 'none'; // 減倉主要減少數量與手續費
+            }
+        }
+
+        function confirmAppendTransaction() {
+            if (currentAppendIndex === null) return;
+            const h = holdingsData[currentAppendIndex];
+            
+            const qty = parseFloat(document.getElementById('modal-qty').value);
+            const price = parseFloat(document.getElementById('modal-price').value);
+            const fee = parseFloat(document.getElementById('modal-fee').value) || 0;
+            const dateStr = document.getElementById('modal-date').value;
+
+            if (isNaN(qty) || qty <= 0) {
+                showToast("錯誤", "請輸入有效的數量！", "error");
+                return;
+            }
+
+            if (currentAppendType === 'BUY') {
+                if (isNaN(price) || price <= 0) {
+                    showToast("錯誤", "請輸入有效的成交單價！", "error");
                     return;
                 }
 
                 const isUs = h.market === 'US';
                 const oldTotalShares = isUs ? h.hands : h.hands * h.lotSize;
-                const newAddShares = isUs ? addQty : addQty * h.lotSize;
+                const newAddShares = isUs ? qty : qty * h.lotSize;
                 const totalNewShares = oldTotalShares + newAddShares;
 
-                // 加權平均計算新成本
-                const newAvgCost = ((oldTotalShares * h.avgCost) + (newAddShares * addPrice)) / totalNewShares;
+                const newAvgCost = ((oldTotalShares * h.avgCost) + (newAddShares * price)) / totalNewShares;
                 
-                h.hands += addQty;
+                h.hands += qty;
                 h.avgCost = newAvgCost;
-                h.fee += addFee;
+                h.fee += fee;
 
-                renderTables();
-                showToast("補紀錄成功", `成功為 ${h.name} 補入買入加倉紀錄！`, "success");
-
-            } else if (mode === "2") {
-                // 減倉邏輯
-                const reduceQty = parseFloat(prompt(`請輸入減倉的 ${unitName}：`, "1"));
-                const reduceFee = parseFloat(prompt(`請輸入本次減倉手續費：`, "15")) || 0;
-
-                if (isNaN(reduceQty) || reduceQty <= 0) {
-                    showToast("錯誤", "無效的數值輸入！", "error");
+                showToast("補單成功", `[${dateStr}] 成功買入加倉 ${qty}，已重新計算平均成本！`, "success");
+            } else {
+                if (qty > h.hands) {
+                    showToast("錯誤", "減倉數量大於當前持有數量！", "error");
                     return;
                 }
 
-                h.hands -= reduceQty;
-                h.fee += reduceFee;
+                h.hands -= qty;
+                h.fee += fee;
 
                 if (h.hands <= 0) {
-                    if (confirm(`減倉後 ${h.name} 持股已歸零，是否清空持倉？`)) {
-                        holdingsData.splice(globalIndex, 1);
+                    if (confirm(`持股已歸零，是否將 ${h.name} 從名單中移除？`)) {
+                        holdingsData.splice(currentAppendIndex, 1);
                     } else {
                         h.hands = 0;
                     }
                 }
 
-                renderTables();
-                showToast("補紀錄成功", `成功為 ${h.name} 補入賣出減倉紀錄！`, "success");
+                showToast("補單成功", `[${dateStr}] 成功賣出減持 ${qty}！`, "success");
             }
+
+            closeAppendModal();
+            renderTables();
         }
 
-        // 倉內切換編輯狀態（包含手續費）
+        // 倉內切換編輯狀態
         function toggleEditRow(globalIndex) {
             if (editingIndex === globalIndex) {
                 saveRowData(globalIndex);
@@ -650,7 +750,6 @@
             }
         }
 
-        // 儲存行數據（含手續費）
         function saveRowData(globalIndex) {
             const h = holdingsData[globalIndex];
             const handsInput = document.getElementById(`edit-hands-${globalIndex}`);
@@ -774,7 +873,7 @@
                             <td class="p-4 text-right font-mono"><span class="font-bold">${displayMarketVal}</span><br><span class="${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</span></td>
                             <td class="p-4 text-center">
                                 <div class="flex items-center justify-center gap-1">
-                                    <button onclick="appendTransaction(${globalIndex})" class="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold transition-all">➕ 補單</button>
+                                    <button onclick="openAppendModal(${globalIndex})" class="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold transition-all">➕ 補單</button>
                                     <button onclick="toggleEditRow(${globalIndex})" class="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold transition-all">✏️ 編輯</button>
                                     <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
                                 </div>
@@ -812,7 +911,7 @@
                             <td class="p-4 text-right font-mono ${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</td>
                             <td class="p-4 text-center">
                                 <div class="flex items-center justify-center gap-1">
-                                    <button onclick="appendTransaction(${globalIndex})" class="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold transition-all">➕ 補單</button>
+                                    <button onclick="openAppendModal(${globalIndex})" class="px-2 py-1 bg-blue-500/15 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded text-[10px] font-bold transition-all">➕ 補單</button>
                                     <button onclick="toggleEditRow(${globalIndex})" class="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold transition-all">✏️ 編輯</button>
                                     <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
                                 </div>
