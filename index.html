@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 強效中文名稱版</title>
+    <title>Stocker PRO Lite · 強效中文顯示版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -247,7 +247,7 @@
 
         const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbwBMDxoBrxdXdAjao2JdB6f9FVAoVM-8HI4IdSPDANPOdclrTTPGEGfD3LxjWgQEtL1Wg/exec";
 
-        // 🌟 強效擴充中文股票名稱字典（支援各種寫法，包括 4 位數字、帶 .HK 或不帶）
+        // 🌟 強效中文股票名稱字典
         const stockNameMapping = {
             '9988.HK': '阿里巴巴-W',
             '9988': '阿里巴巴-W',
@@ -318,29 +318,20 @@
             }
         }
 
-        // 🌟 強效中文全稱識別函數（支援純數字、補足 4 位、比對字典）
+        // 🌟 強效中文全稱識別函數：不管傳入什麼，都強制對應字典
         function getStockFullName(symbol) {
-            let clean = symbol.toUpperCase().trim();
+            if (!symbol) return '未知股票';
+            let clean = String(symbol).toUpperCase().trim();
             
-            // 如果直接在字典內，立即返回
-            if (stockNameMapping[clean]) {
-                return stockNameMapping[clean];
-            }
-
-            // 如果全是數字，嘗試補足 4 位數或加上 .HK 比對
-            if (/^\d+$/.test(clean)) {
-                let padded = clean.padStart(4, '0');
-                if (stockNameMapping[padded]) return stockNameMapping[padded];
-                if (stockNameMapping[padded + '.HK']) return stockNameMapping[padded + '.HK'];
-            }
+            if (stockNameMapping[clean]) return stockNameMapping[clean];
 
             let base = clean.replace('.HK', '');
             if (stockNameMapping[base]) return stockNameMapping[base];
             if (stockNameMapping[base.padStart(4, '0')]) return stockNameMapping[base.padStart(4, '0')];
+            if (stockNameMapping[base.padStart(4, '0') + '.HK']) return stockNameMapping[base.padStart(4, '0') + '.HK'];
 
-            // 如果字典完全沒有，自動為港股數字加上預設名稱或顯示代號
-            if (/^\d+$/.test(clean)) {
-                return `港股 (${clean.padStart(4, '0')})`;
+            if (/^\d+$/.test(base)) {
+                return `港股 (${base.padStart(4, '0')})`;
             }
 
             return clean;
@@ -477,14 +468,13 @@
             
             renderDropdownList(matches);
 
-            if (/^\d+$/.test(cleanQuery)) {
-                const name = getStockFullName(cleanQuery);
-                marketBadge.textContent = `🇭🇰 港股 (${name})`;
+            const resolvedName = getStockFullName(cleanQuery);
+            if (/^\d+$/.test(cleanQuery) || cleanQuery.endsWith('.HK')) {
+                marketBadge.textContent = `🇭🇰 港股 (${resolvedName})`;
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股手數 (預設每手 500 股)';
             } else {
-                const name = getStockFullName(cleanQuery);
-                marketBadge.textContent = `🇺🇸 美股 (${name})`;
+                marketBadge.textContent = `🇺🇸 美股 (${resolvedName})`;
                 marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股數量 (股)';
             }
@@ -519,13 +509,14 @@
 
             const marketBadge = document.getElementById('input-market-badge');
             const sharesLabel = document.getElementById('label-shares');
+            const resolvedName = getStockFullName(item.symbol);
             
             if (item.market === 'HK') {
-                marketBadge.textContent = `🇭🇰 港股 (${item.name})`;
+                marketBadge.textContent = `🇭🇰 港股 (${resolvedName})`;
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = `初始持股手數 (每手 ${item.lotSize} 股)`;
             } else {
-                marketBadge.textContent = `🇺🇸 美股 (${item.name})`;
+                marketBadge.textContent = `🇺🇸 美股 (${resolvedName})`;
                 marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股數量 (股)';
             }
@@ -593,7 +584,7 @@
                 existing.hands += inputVal;
                 existing.avgCost = ((existing.hands - inputVal) * existing.avgCost + inputVal * avgCost) / existing.hands;
                 existing.fee += fee;
-                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.name} 中。`, "success");
+                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockName} 中。`, "success");
             } else {
                 holdingsData.push({
                     symbol: stockInfo.symbol,
@@ -724,8 +715,9 @@
 
         function adjustShares(globalIndex) {
             const h = holdingsData[globalIndex];
+            const resolvedName = getStockFullName(h.symbol);
             const unitName = h.market === 'HK' ? '手數' : '股數';
-            const input = prompt(`請輸入 ${h.name} (${h.symbol}) 要變動的${unitName}：\n（正數增加，負數減少）`, "1");
+            const input = prompt(`請輸入 ${resolvedName} (${h.symbol}) 要變動的${unitName}：\n（正數增加，負數減少）`, "1");
             if (input === null) return;
             const delta = parseFloat(input);
 
@@ -736,24 +728,25 @@
 
             h.hands += delta;
             if (h.hands <= 0) {
-                if (confirm(`持股已歸零，是否將 ${h.name} 從名單中【剷除】？`)) {
+                if (confirm(`持股已歸零，是否將 ${resolvedName} 從名單中【剷除】？`)) {
                     holdingsData.splice(globalIndex, 1);
-                    showToast("已剷除", `${h.name} 已移除。`, "success");
+                    showToast("已剷除", `${resolvedName} 已移除。`, "success");
                 } else {
                     h.hands = 0;
                 }
             } else {
-                showToast("調整成功", `${h.name} 現有持股: ${h.hands} ${h.market === 'HK' ? '手' : '股'}`, "success");
+                showToast("調整成功", `${resolvedName} 現有持股: ${h.hands} ${h.market === 'HK' ? '手' : '股'}`, "success");
             }
             renderTables();
         }
 
         function deleteHolding(globalIndex) {
             const h = holdingsData[globalIndex];
-            if (confirm(`確定要將 ${h.name} (${h.symbol}) 徹底【剷除】嗎？`)) {
+            const resolvedName = getStockFullName(h.symbol);
+            if (confirm(`確定要將 ${resolvedName} (${h.symbol}) 徹底【剷除】嗎？`)) {
                 holdingsData.splice(globalIndex, 1);
                 renderTables();
-                showToast("已剷除", `${h.name} 已刪除。`, "success");
+                showToast("已剷除", `${resolvedName} 已刪除。`, "success");
             }
         }
 
@@ -798,6 +791,9 @@
                     tr.addEventListener('dragend', handleDragEnd);
                 }
 
+                // 🌟 關鍵修正：渲染表格時強制透過字典對應出中文全稱
+                const resolvedName = getStockFullName(h.symbol);
+
                 const displayCost = isUs ? formatMoney(h.avgCost * exchangeRate) : formatMoney(h.avgCost);
                 const displayPrice = hasValidPrice ? (isUs ? formatMoney(h.currentPrice * exchangeRate) : formatMoney(h.currentPrice)) : '<span class="text-rose-400 font-bold">???</span>';
                 const displayMarketVal = hasValidPrice ? formatMoney(marketValHkd) : '<span class="text-rose-400 font-bold">???</span>';
@@ -808,7 +804,7 @@
                     const marketTag = isUs ? '<span class="text-blue-400 font-bold">美股</span>' : '<span class="text-amber-400 font-bold">港股</span>';
                     tr.innerHTML = `
                         <td class="p-4 text-center text-gray-500">${isManualActive ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
-                        <td class="p-4 font-bold text-white">${marketTag} <strong class="text-white">${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                        <td class="p-4 font-bold text-white">${marketTag} <strong class="text-white">${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${resolvedName}</span></td>
                         <td class="p-4 font-mono font-bold text-amber-300">
                             ${isUs ? `${h.hands.toLocaleString()} 股` : `${h.hands} 手 <span class='text-[10px] text-gray-400'>(共 ${actualShares.toLocaleString()} 股)</span>`}
                         </td>
@@ -834,7 +830,7 @@
                 } else {
                     tr.innerHTML = `
                         <td class="p-4 text-center text-gray-500">${isManualActive ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
-                        <td class="p-4 font-bold text-white">${h.symbol}<br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                        <td class="p-4 font-bold text-white">${h.symbol}<br><span class="text-[11px] text-amber-300 font-bold">${resolvedName}</span></td>
                         <td class="p-4 font-mono font-bold text-amber-300">
                             ${isUs ? `${h.hands.toLocaleString()} 股` : `${h.hands} 手 <span class='text-[10px] text-gray-400'>(共 ${actualShares.toLocaleString()} 股)</span>`}
                         </td>
