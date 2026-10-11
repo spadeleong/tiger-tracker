@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 轉折點一 (全自動雲端記錄版)</title>
+    <title>Stocker PRO Lite · 轉折點一 (雲端同步記錄版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、試算表公式名稱、雲端自動記錄系統</p>
+            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、公式名稱、雲端同步持久化系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (自動記錄至試算表)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (自動記錄至雲端試算表)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -283,7 +283,7 @@
                             symbol: sym,
                             name: item.name || sym,
                             market: isHK ? 'HK' : 'US',
-                            hands: 1, // 預設初始值，用戶可自行調整
+                            hands: 1,
                             lotSize: isHK ? 500 : 1,
                             avgCost: typeof item.price === 'number' ? item.price : 100,
                             currentPrice: item.price,
@@ -419,7 +419,6 @@
             const stockName = activeInputStock ? activeInputStock.name : symbolInput;
             const currentPrice = activeInputStock && activeInputStock.price !== '???' ? activeInputStock.price : avgCost;
 
-            // 🌟 觸發後台 API 新增到雲端試算表
             try {
                 await fetch(`${GOOGLE_API_URL}?symbol=${encodeURIComponent(symbolInput)}`);
             } catch(err) {
@@ -591,12 +590,20 @@
             showToast("調整成功", `持股已更新`, "success");
         }
 
-        function deleteHolding(globalIndex) {
+        // 🌟 支援雲端同步刪除的函數
+        async function deleteHolding(globalIndex) {
             const h = holdingsData[globalIndex];
-            if (confirm(`確定要將 ${h.name} (${h.symbol}) 刪除嗎？`)) {
+            if (confirm(`確定要將 ${h.name} (${h.symbol}) 徹底刪除嗎？`)) {
                 holdingsData.splice(globalIndex, 1);
                 renderTables();
-                showToast("已刪除", `${h.name} 已移除`, "success");
+
+                try {
+                    await fetch(`${GOOGLE_API_URL}?action=delete&symbol=${encodeURIComponent(h.symbol)}`);
+                    showToast("已剷除", `${h.name} 已從雲端試算表移除`, "success");
+                } catch (err) {
+                    console.warn("雲端同步刪除失敗", err);
+                    showToast("提示", "本地已刪除，但雲端同步可能需時", "warning");
+                }
             }
         }
 
@@ -722,7 +729,7 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // 🌟 網頁啟動時自動觸發雲端數據同步加載
+        // 🌟 網頁啟動時自動加載雲端數據
         window.onload = function() {
             loadCloudHoldings();
         };
