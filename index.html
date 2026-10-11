@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 轉折點一 (修復版)</title>
+    <title>Stocker PRO Lite · 轉折點一 (完整升級版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (自動記錄至雲端試算表)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -94,6 +94,7 @@
                     </div>
                 </div>
 
+                <!-- 實時進度條與狀態顯示區塊 -->
                 <div id="search-progress-container" class="hidden space-y-1.5 pt-1">
                     <div class="flex justify-between items-center text-[11px]">
                         <span id="search-status-text" class="text-amber-400 font-bold flex items-center gap-1.5">
@@ -106,6 +107,7 @@
                     </div>
                 </div>
 
+                <!-- 月供剔選框 -->
                 <div class="flex items-center gap-2 pt-2 border-t border-gray-800/60">
                     <input type="checkbox" id="input-is-dca" class="w-4 h-4 rounded bg-gray-800 border-gray-700 text-amber-400 focus:ring-amber-400 accent-amber-400 cursor-pointer">
                     <label for="input-is-dca" class="text-xs text-gray-300 cursor-pointer font-medium flex items-center gap-1">
@@ -115,7 +117,7 @@
             </form>
         </div>
 
-        <!-- 🇭🇰 一般港股持倉區塊 -->
+        <!-- ==================== 🇭🇰 一般港股持倉區塊 ==================== -->
         <div class="bg-gray-900 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
             <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-950/30">
                 <div class="flex items-center gap-2">
@@ -132,6 +134,7 @@
                     </button>
                 </div>
             </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-950 text-[10px] uppercase text-gray-400 border-b border-gray-800">
@@ -151,7 +154,7 @@
             </div>
         </div>
 
-        <!-- 🇺🇸 一般美股持倉區塊 -->
+        <!-- ==================== 🇺🇸 一般美股持倉區塊 ==================== -->
         <div class="bg-gray-900 rounded-2xl border border-gray-800 shadow-xl overflow-hidden">
             <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-950/30">
                 <div class="flex items-center gap-2">
@@ -168,6 +171,7 @@
                     </button>
                 </div>
             </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-950 text-[10px] uppercase text-gray-400 border-b border-gray-800">
@@ -187,12 +191,12 @@
             </div>
         </div>
 
-        <!-- 📅 月供計劃專屬名單區塊 -->
+        <!-- ==================== 📅 月供計劃專屬名單區塊 ==================== -->
         <div class="bg-gray-900 rounded-2xl border border-amber-500/30 shadow-xl overflow-hidden">
             <div class="p-5 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-amber-500/5">
                 <div class="flex items-center gap-2">
                     <span class="text-base">📅</span>
-                    <h3 class="text-sm font-bold text-amber-400">月供計劃專屬名單</h3>
+                    <h3 class="text-sm font-bold text-amber-400">月供計劃專屬名單 (含自動排版與一鍵記帳)</h3>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button onclick="executeDcaExecution()" class="px-3 py-1.5 bg-amber-400 hover:bg-amber-500 text-gray-950 text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1">
@@ -207,6 +211,7 @@
                     </button>
                 </div>
             </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-950 text-[10px] uppercase text-gray-400 border-b border-gray-800">
@@ -236,7 +241,6 @@
 
         let baseCurrency = 'HKD';
         const exchangeRate = 7.8;
-        // 優先從 localStorage 讀取現金，若無則預設 66800.53
         let cashReserve = localStorage.getItem('stocker_cash_reserve') !== null ? parseFloat(localStorage.getItem('stocker_cash_reserve')) : 66800.53;
 
         const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbwBMDxoBrxdXdAjao2JdB6f9FVAoVM-8HI4IdSPDANPOdclrTTPGEGfD3LxjWgQEtL1Wg/exec";
@@ -447,7 +451,6 @@
             renderTables();
         }
 
-        // 🌟 調整現金功能（同時寫入 localStorage 保存）
         function adjustCash() {
             const input = prompt(`請輸入新的現金金額，或輸入變動數額（支援加減）：\n例如直接輸入「50000」設為指定金額，或輸入「+1000」/「-500」進行增減。\n目前現金: HK$ ${cashReserve.toLocaleString(undefined, {minimumFractionDigits: 2})}`, cashReserve);
             
@@ -472,8 +475,6 @@
             }
 
             if (cashReserve < 0) cashReserve = 0;
-
-            // 保存至本地存儲，防止重新整理丟失
             localStorage.setItem('stocker_cash_reserve', cashReserve);
 
             renderTables();
@@ -731,39 +732,39 @@
 
         function handleDragEnd(e) { this.classList.remove('dragging'); }
 
-        // 🌟 強化版：手機下拉刷新（Pull-to-Refresh）觸控邏輯
+        // 🌟 高靈敏度版：手機下拉刷新機制
         let touchStartY = 0;
-        let isPulling = false;
+        let isAtTop = false;
 
         window.addEventListener('touchstart', function(e) {
-            if (window.scrollY <= 5) {
+            isAtTop = (window.scrollY === 0);
+            if (isAtTop) {
                 touchStartY = e.touches[0].clientY;
-                isPulling = true;
             }
         }, { passive: true });
 
         window.addEventListener('touchmove', function(e) {
-            if (!isPulling) return;
+            if (!isAtTop) return;
             const currentY = e.touches[0].clientY;
             const pullDistance = currentY - touchStartY;
 
-            if (pullDistance > 70 && window.scrollY <= 5) {
+            if (pullDistance > 50) {
                 showPullRefreshIndicator(true);
             }
         }, { passive: true });
 
         window.addEventListener('touchend', function(e) {
-            if (!isPulling) return;
-            isPulling = false;
-            
+            if (!isAtTop) return;
             const pullDistance = e.changedTouches[0].clientY - touchStartY;
-            if (pullDistance > 70 && window.scrollY <= 5) {
+            
+            if (pullDistance > 50) {
                 showPullRefreshIndicator(false);
                 showToast("正在重新整理", "正在重新加載雲端數據...", "info");
                 loadCloudHoldings();
             } else {
                 showPullRefreshIndicator(false);
             }
+            isAtTop = false;
         });
 
         function showPullRefreshIndicator(show) {
@@ -795,3 +796,5 @@
     </script>
 </body>
 </html>
+
+
