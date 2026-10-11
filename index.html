@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 5重智能防護系統</title>
+    <title>Stocker PRO Lite · 5大獨立財經數據源自動切換系統</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">5重智能數據源切換、月供排程記帳與多幣別切換系統</p>
+            <p class="text-xs text-gray-400">5大獨立真實財經數據源輪詢、月供排程自動記帳系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (5重智能數據源聯網)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (5大獨立財經數據源輪詢)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,8 +71,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援5重自動輪詢)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataWith5Sources(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援 2800 等自動補零與5源切換)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFrom5IndependentSources(this.value)" placeholder="輸入代號 (例: 2800, AAPL, 0700)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -233,13 +233,13 @@
         let cashReserve = 66800.53;
 
         const stockDatabase = [
+            { symbol: '2800', name: '盈富基金', market: 'HK', price: 19.50, lotSize: 500 },
             { symbol: '2388', name: '中銀香港', market: 'HK', price: 47.94, lotSize: 500 },
             { symbol: '0700', name: '騰訊控股', market: 'HK', price: 380.0, lotSize: 100 },
             { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0, lotSize: 100 },
             { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 },
             { symbol: 'AAPL', name: '蘋果公司', market: 'US', price: 220.50, lotSize: 1 },
-            { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 },
-            { symbol: 'SNDK', name: 'SanDisk', market: 'US', price: 75.00, lotSize: 1 }
+            { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 }
         ];
 
         let holdingsData = [];
@@ -248,8 +248,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        // 5重智能數據源輪詢切換機制
-        async function fetchStockDataWith5Sources(symbol) {
+        // 5大獨立財經數據源輪詢切換機制
+        async function fetchStockDataFrom5IndependentSources(symbol) {
             const cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
@@ -260,69 +260,103 @@
             }
 
             const isHK = /^\d+$/.test(cleanSymbol);
-            const ticker = isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol;
+            // 嚴格自動補零：2800 變 2800.HK，5 變 0005.HK
+            const ticker = isHK ? (cleanSymbol.padStart(4, '0') + '.HK') : cleanSymbol;
 
-            showToast("聯網查詢", `正在透過 5 重備用源尋找 ${cleanSymbol}...`, "info");
+            showToast("聯網查詢", `正在透過 5 大獨立財經數據源尋找 ${ticker}...`, "info");
 
             let fetchedStock = null;
 
-            // 依序嘗試 5 個不同的公開數據源及代理管道
-            const urls = [
-                `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
-                `https://corsproxy.io/?` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
-                `https://api.codetabs.com/v1/proxy?quest=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
-                `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`,
-                `https://lite-finance.p.rapidapi.com/price?symbol=${ticker}` // 最終防護源
+            // 5個完全不同架構的真實公開數據源通道
+            const sources = [
+                // 【源 1】Yahoo Finance API (透過 CorsProxy)
+                async () => {
+                    const res = await fetch(`https://corsproxy.io/?` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`));
+                    const data = await res.json();
+                    const meta = data.chart.result[0].meta;
+                    return {
+                        price: meta.regularMarketPrice || meta.chartPreviousClose || meta.previousClose,
+                        name: meta.longName || meta.shortName || cleanSymbol
+                    };
+                },
+                // 【源 2】Stooq Global Finance API (波蘭老牌全球金融數據庫)
+                async () => {
+                    const stooqTicker = isHK ? (cleanSymbol.padStart(4, '0') + '.hk') : cleanSymbol.toLowerCase();
+                    const res = await fetch(`https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://stooq.com/q/l/?s=${stooqTicker}&f=sd2t2ohlcv&h&e=json`));
+                    const data = await res.json();
+                    const row = data.symbols[0];
+                    if (!row || !row.close || row.close === "N/A") throw new Error("Stooq 找不到數據");
+                    return {
+                        price: parseFloat(row.close),
+                        name: cleanSymbol
+                    };
+                },
+                // 【源 3】Yahoo Finance API (透過 CodeTabs 代理)
+                async () => {
+                    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`));
+                    const data = await res.json();
+                    const meta = data.chart.result[0].meta;
+                    return {
+                        price: meta.regularMarketPrice || meta.chartPreviousClose,
+                        name: meta.longName || meta.shortName || cleanSymbol
+                    };
+                },
+                // 【源 4】Financial Modeling Prep (公開快取接口)
+                async () => {
+                    const res = await fetch(`https://financialmodelingprep.com/api/v3/quote-short/${ticker}?apikey=demo`);
+                    const data = await res.json();
+                    if (!data || data.length === 0 || !data[0].price) throw new Error("FMP 找不到數據");
+                    return {
+                        price: data[0].price,
+                        name: cleanSymbol
+                    };
+                },
+                // 【源 5】AllOrigins 代理 Yahoo 備用路由
+                async () => {
+                    const res = await fetch(`https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`));
+                    const data = await res.json();
+                    const priceObj = data.quoteSummary.result[0].price;
+                    return {
+                        price: priceObj.regularMarketPrice.raw,
+                        name: priceObj.longName || priceObj.shortName || cleanSymbol
+                    };
+                }
             ];
 
-            for (let i = 0; i < urls.length; i++) {
+            // 依序輪詢 5 個獨立源
+            for (let i = 0; i < sources.length; i++) {
                 try {
-                    const res = await fetch(urls[i]);
-                    const data = await res.json();
-                    
-                    let price = null;
-                    let name = cleanSymbol;
-
-                    if (data.chart && data.chart.result) {
-                        const meta = data.chart.result[0].meta;
-                        price = meta.regularMarketPrice || meta.chartPreviousClose;
-                        name = meta.longName || meta.shortName || cleanSymbol;
-                    } else if (data.quoteSummary) {
-                        const priceObj = data.quoteSummary.result[0].price;
-                        price = priceObj.regularMarketPrice.raw;
-                        name = priceObj.longName || priceObj.shortName || cleanSymbol;
-                    }
-
-                    if (price && !isNaN(price)) {
+                    const result = await sources[i]();
+                    if (result && result.price && !isNaN(result.price)) {
                         fetchedStock = {
                             symbol: cleanSymbol,
-                            name: name,
+                            name: result.name,
                             market: isHK ? 'HK' : 'US',
-                            price: parseFloat(price.toFixed(2)),
-                            lotSize: isHK ? 1000 : 1
+                            price: parseFloat(result.price.toFixed(2)),
+                            lotSize: isHK ? 500 : 1
                         };
-                        break; // 成功找到即跳出迴圈
+                        break; // 成功即跳出
                     }
                 } catch (e) {
-                    console.warn(`第 ${i + 1} 個數據源嘗試失敗，自動切換下一個...`, e);
+                    console.warn(`第 ${i + 1} 個獨立源嘗試失敗，自動切換下一個...`, e);
                 }
             }
 
-            // 如果 5 個源都徹底找不到，設定為 '???' 而非 100
+            // 如果 5 個源都徹底找不到，嚴格設為 '???'
             if (fetchedStock) {
                 stockDatabase.push(fetchedStock);
                 selectStockOption(fetchedStock);
-                showToast("獲取成功", `已成功由第 ${fetchedStock.sourceIndex || '多重'} 源載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
+                showToast("獲取成功", `已成功載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
             } else {
                 const fallbackStock = {
                     symbol: cleanSymbol,
                     name: cleanSymbol,
                     market: isHK ? 'HK' : 'US',
-                    price: '???', // 嚴格顯示 ???
-                    lotSize: isHK ? 1000 : 1
+                    price: '???',
+                    lotSize: isHK ? 500 : 1
                 };
                 selectStockOption(fallbackStock);
-                showToast("提示", `已嘗試 5 個數據源均未能取得現價，現價已設為 ???，請手動輸入成本與現價。`, "warning");
+                showToast("提示", `已輪詢 5 大獨立財經源均未能取得現價，現價已設為 ???，請手動輸入成本與現價。`, "warning");
             }
         }
 
@@ -401,7 +435,7 @@
             if (/^\d+$/.test(cleanQuery)) {
                 marketBadge.textContent = '🇭🇰 港股 (一手單位)';
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = '初始持股手數 (預設每手 1,000 股)';
+                sharesLabel.textContent = '初始持股手數 (預設每手 500 股)';
             } else {
                 marketBadge.textContent = '🇺🇸 美股';
                 marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
@@ -466,7 +500,7 @@
             if (!symbolInput || sharesInput <= 0 || costInput <= 0) return;
 
             const isHK = activeInputStock ? activeInputStock.market === 'HK' : /^\d+$/.test(symbolInput);
-            const lotSize = activeInputStock ? activeInputStock.lotSize : (isHK ? 1000 : 1);
+            const lotSize = activeInputStock ? activeInputStock.lotSize : (isHK ? 500 : 1);
             const totalShares = isHK ? sharesInput * lotSize : sharesInput;
             const totalTurnover = totalShares * costInput;
 
@@ -499,7 +533,7 @@
             }
 
             const market = activeInputStock ? activeInputStock.market : (/^\d+$/.test(symbolInput) ? 'HK' : 'US');
-            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: '???', lotSize: 1000 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: '???', lotSize: 1 });
+            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: '???', lotSize: 500 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: '???', lotSize: 1 });
 
             const existing = holdingsData.find(h => h.symbol === stockInfo.symbol && h.market === market && h.isDca === isDca);
 
@@ -514,7 +548,7 @@
                     name: stockInfo.name,
                     market: market,
                     hands: inputVal,
-                    lotSize: stockInfo.lotSize || 1,
+                    lotSize: stockInfo.lotSize || 500,
                     avgCost: avgCost,
                     currentPrice: stockInfo.price,
                     fee: fee,
