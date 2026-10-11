@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 終極修復版</title>
+    <title>Stocker PRO Lite · 全自動聯網名稱版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -11,9 +11,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #030712; color: #f3f4f6; }
-        .dragging { opacity: 0.4; background-color: #1f2937 !important; }
-        tr[draggable="true"] { cursor: grab; }
-        tr[draggable="true"]:active { cursor: grabbing; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col p-6 max-w-6xl mx-auto pb-16">
@@ -22,7 +19,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、智能中文名稱配對與資產管理系統</p>
+            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、全自動名稱與現價同步系統</p>
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400 font-bold">基礎貨幣:</span>
@@ -62,7 +59,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (全自動聯網抓取名稱與現價)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -70,8 +67,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (例: 6951, 9988, HIMS)</label>
-                        <input type="text" id="input-symbol" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromGoogleSheets(this.value)" placeholder="輸入代號..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (例: 6951, 9988, TSLA)</label>
+                        <input type="text" id="input-symbol" onblur="fetchStockDetails(this.value)" placeholder="輸入代號..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                     </div>
 
                     <div>
@@ -93,24 +90,11 @@
                     </div>
                 </div>
 
-                <!-- 實時進度條 -->
-                <div id="search-progress-container" class="hidden space-y-1.5 pt-1">
-                    <div class="flex justify-between items-center text-[11px]">
-                        <span id="search-status-text" class="text-amber-400 font-bold flex items-center gap-1.5">
-                            <span class="animate-spin">⏳</span> 正在向 Google 試算表查詢現價...
-                        </span>
-                        <span id="search-percent-text" class="text-gray-400 font-mono">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden border border-gray-700">
-                        <div id="search-progress-bar" class="bg-amber-400 h-full w-0 transition-all duration-300 ease-out"></div>
-                    </div>
-                </div>
-
                 <!-- 月供剔選框 -->
                 <div class="flex items-center gap-2 pt-2 border-t border-gray-800/60">
                     <input type="checkbox" id="input-is-dca" class="w-4 h-4 rounded bg-gray-800 border-gray-700 text-amber-400 focus:ring-amber-400 accent-amber-400 cursor-pointer">
                     <label for="input-is-dca" class="text-xs text-gray-300 cursor-pointer font-medium flex items-center gap-1">
-                        📅 設為月供計劃 <span class="text-[10px] text-amber-400">(勾選後將自動歸納至獨立的「月供計劃專屬名單」中)</span>
+                        📅 設為月供計劃 <span class="text-[10px] text-amber-400">(勾選後將自動歸納至獨立的月供計劃專屬名單中)</span>
                     </label>
                 </div>
             </form>
@@ -123,7 +107,9 @@
                     <span class="text-base">🇭🇰</span>
                     <h3 class="text-sm font-bold text-white">一般港股持倉名單 (非月供)</h3>
                 </div>
-                <button onclick="autoFormatTable('HK')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 text-xs font-bold rounded-xl border border-amber-500/20 transition-all">✨ 一鍵排版</button>
+                <button onclick="refreshAllPrices()" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 text-xs font-bold rounded-xl border border-amber-500/20 transition-all flex items-center gap-1">
+                    🔄 更新實時現價
+                </button>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-300">
@@ -150,7 +136,6 @@
                     <span class="text-base">🇺🇸</span>
                     <h3 class="text-sm font-bold text-white">一般美股持倉名單 (非月供)</h3>
                 </div>
-                <button onclick="autoFormatTable('US')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 text-xs font-bold rounded-xl border border-amber-500/20 transition-all">✨ 一鍵排版</button>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-gray-300">
@@ -211,122 +196,57 @@
 
         const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbwBMDxoBrxdXdAjao2JdB6f9FVAoVM-8HI4IdSPDANPOdclrTTPGEGfD3LxjWgQEtL1Wg/exec";
 
-        // 🌟 智能代號對應中文名稱庫
-        const smartStockNames = {
-            '6951': '元續科技',
-            '6951.HK': '元續科技',
-            '9988': '阿里巴巴-W',
-            '9988.HK': '阿里巴巴-W',
-            '0700': '騰訊控股',
-            '700': '騰訊控股',
-            '0700.HK': '騰訊控股',
-            '700.HK': '騰訊控股',
-            '2800': '盈富基金',
-            '2800.HK': '盈富基金',
-            '2388': '中銀香港',
-            '2388.HK': '中銀香港',
-            '0005': '滙豐控股',
-            '5': '滙豐控股',
-            '3690': '美團-W',
-            '3690.HK': '美團-W',
-            '1810': '小米集團-W',
-            '1810.HK': '小米集團-W',
-            'AAPL': '蘋果公司 (Apple)',
-            'TSLA': '特斯拉 (Tesla)',
-            'HIMS': 'Hims & Hers Health',
-            'NVDA': '輝達 (NVIDIA)',
-            'MSFT': '微軟 (Microsoft)',
-            'AMZN': '亞馬遜 (Amazon)',
-            'PLTR': '帕蘭提爾 (Palantir)'
-        };
-
         let holdingsData = [];
 
-        function updateProgress(percent, text, isSuccess = true) {
-            const container = document.getElementById('search-progress-container');
-            const bar = document.getElementById('search-progress-bar');
-            const statusText = document.getElementById('search-status-text');
-            const percentText = document.getElementById('search-percent-text');
+        // 🌟 自動聯網從公開免費 API 獲取股票名稱與現價
+        async function fetchStockDetails(symbolInput) {
+            let clean = symbolInput.toUpperCase().trim();
+            if (!clean) return;
 
-            container.classList.remove('hidden');
-            bar.style.width = percent + '%';
-            percentText.textContent = percent + '%';
-            statusText.innerHTML = text;
-
-            if (percent === 100) {
-                setTimeout(() => { container.classList.add('hidden'); }, 2000);
-            }
-        }
-
-        function resolveStockName(symbol) {
-            if (!symbol) return '未知股票';
-            let clean = String(symbol).toUpperCase().trim();
-            if (smartStockNames[clean]) return smartStockNames[clean];
-
-            let base = clean.replace('.HK', '');
-            if (smartStockNames[base]) return smartStockNames[base];
-            if (smartStockNames[base.padStart(4, '0')]) return smartStockNames[base.padStart(4, '0')];
-            if (smartStockNames[base.padStart(4, '0') + '.HK']) return smartStockNames[base.padStart(4, '0') + '.HK'];
-
-            if (/^\d+$/.test(base)) {
-                return `港股 (${base.padStart(4, '0')})`;
-            }
-            return clean;
-        }
-
-        async function fetchStockDataFromGoogleSheets(symbol) {
-            let cleanSymbol = symbol.toUpperCase().trim();
-            if (!cleanSymbol) return;
-
-            let querySymbol = cleanSymbol;
-            if (/^\d+$/.test(cleanSymbol)) {
-                querySymbol = cleanSymbol.padStart(4, '0') + '.HK';
+            let querySymbol = clean;
+            if (/^\d+$/.test(clean)) {
+                querySymbol = clean.padStart(4, '0') + '.HK';
             }
 
-            const resolvedName = resolveStockName(cleanSymbol);
-            updateProgress(40, `<span class="animate-spin">⏳</span> 正在向 Google 試算表查詢 ${resolvedName} 價格...`);
+            showToast("聯網查詢", `正在自動檢索 ${querySymbol} 資訊...`, "info");
 
-            let fetchedPrice = null;
+            let stockName = querySymbol;
+            let stockPrice = null;
 
+            // 1. 自動從 Yahoo Finance 公開 API 抓取公司名稱
             try {
-                const response = await fetch(`${GOOGLE_API_URL}?symbol=${encodeURIComponent(querySymbol)}`);
-                const data = await response.json();
-
-                const priceVal = data[querySymbol] !== undefined ? data[querySymbol] : (data[cleanSymbol] !== undefined ? data[cleanSymbol] : data[cleanSymbol.replace('.HK', '')]);
-                if (priceVal !== undefined && !isNaN(priceVal)) {
-                    fetchedPrice = parseFloat(priceVal);
+                const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(querySymbol)}`);
+                const json = await res.json();
+                if (json.quotes && json.quotes.length > 0) {
+                    stockName = json.quotes[0].longname || json.quotes[0].shortname || querySymbol;
                 }
             } catch (err) {
-                console.warn("無法連接 Google 試算表 API", err);
+                console.warn("無法聯網抓取名稱", err);
             }
 
-            const isHK = querySymbol.endsWith('.HK') || /^\d+$/.test(cleanSymbol);
-            const standardizedSymbol = isHK ? (cleanSymbol.replace('.HK', '').padStart(4, '0') + '.HK') : cleanSymbol;
+            // 2. 從 Google 試算表獲取實時現價
+            try {
+                const resSheet = await fetch(`${GOOGLE_API_URL}?symbol=${encodeURIComponent(querySymbol)}`);
+                const sheetData = await resSheet.json();
+                const priceVal = sheetData[querySymbol] !== undefined ? sheetData[querySymbol] : sheetData[clean];
+                if (priceVal !== undefined && !isNaN(priceVal)) {
+                    stockPrice = parseFloat(priceVal);
+                }
+            } catch (err) {
+                console.warn("無法從 Google 試算表獲取現價", err);
+            }
 
-            document.getElementById('input-cost').value = (fetchedPrice !== null) ? fetchedPrice : '';
-            updateProgress(100, `✅ 成功獲取 ${resolvedName}！`, true);
-            showToast("獲取成功", `已自動帶出 ${resolvedName} 相關數據`, "success");
-            calculateTigerFee();
-        }
+            document.getElementById('input-symbol').value = querySymbol;
+            if (stockPrice !== null) {
+                document.getElementById('input-cost').value = stockPrice;
+            }
 
-        function handleSymbolInput(query) {
-            const cleanQuery = query.toUpperCase().trim();
             const marketBadge = document.getElementById('input-market-badge');
-            const sharesLabel = document.getElementById('label-shares');
+            const isHK = querySymbol.endsWith('.HK');
+            marketBadge.textContent = `${isHK ? '🇭🇰 港股' : '🇺🇸 美股'} : ${stockName}`;
 
-            if (!cleanQuery) {
-                marketBadge.textContent = '等待選擇代號...';
-                return;
-            }
-
-            const resolvedName = resolveStockName(cleanQuery);
-            if (/^\d+$/.test(cleanQuery) || cleanQuery.endsWith('.HK')) {
-                marketBadge.textContent = `🇭🇰 港股 (${resolvedName})`;
-                sharesLabel.textContent = '初始持股手數 (預設每手 500 股)';
-            } else {
-                marketBadge.textContent = `🇺🇸 美股 (${resolvedName})`;
-                sharesLabel.textContent = '初始持股數量 (股)';
-            }
+            showToast("成功", `已自動帶出：${stockName}`, "success");
+            calculateTigerFee();
         }
 
         function calculateTigerFee() {
@@ -336,8 +256,8 @@
 
             if (!symbolInput || sharesInput <= 0 || costInput <= 0) return;
 
-            const isHK = symbolInput.endsWith('.HK') || /^\d+$/.test(symbolInput);
-            const lotSize = isHK ? (symbolInput.includes('9988') ? 100 : 500) : 1;
+            const isHK = symbolInput.endsWith('.HK');
+            const lotSize = isHK ? 500 : 1;
             const totalShares = isHK ? sharesInput * lotSize : sharesInput;
             const totalTurnover = totalShares * costInput;
 
@@ -356,36 +276,38 @@
             const avgCost = parseFloat(document.getElementById('input-cost').value);
             const fee = parseFloat(document.getElementById('input-fee').value) || 0;
             const isDca = document.getElementById('input-is-dca').checked;
+            const marketBadgeText = document.getElementById('input-market-badge').textContent;
+            const stockName = marketBadgeText.includes(':') ? marketBadgeText.split(':')[1].trim() : symbolInput;
 
             if (!symbolInput || isNaN(inputVal) || isNaN(avgCost)) {
-                showToast("輸入錯誤", "請填寫完整代號與數值！", "error");
+                showToast("錯誤", "請填寫完整代號與數值！", "error");
                 return;
             }
 
-            const isHK = symbolInput.endsWith('.HK') || /^\d+$/.test(symbolInput);
-            const resolvedName = resolveStockName(symbolInput);
+            const isHK = symbolInput.endsWith('.HK');
 
             holdingsData.push({
                 symbol: symbolInput,
-                name: resolvedName,
+                name: stockName,
                 market: isHK ? 'HK' : 'US',
                 hands: inputVal,
-                lotSize: isHK ? (symbolInput.includes('9988') ? 100 : 500) : 1,
+                lotSize: isHK ? 500 : 1,
                 avgCost: avgCost,
-                currentPrice: avgCost, // 初始預設，稍後會自動聯網更新
+                currentPrice: avgCost,
                 fee: fee,
                 isDca: isDca,
                 dcaDay: 15,
                 dcaAmount: 500
             });
 
-            showToast("新增成功", `成功加入 ${resolvedName}！`, "success");
+            showToast("新增成功", `成功加入 ${stockName}！`, "success");
 
             document.getElementById('input-symbol').value = '';
             document.getElementById('input-shares').value = '';
             document.getElementById('input-cost').value = '';
             document.getElementById('input-fee').value = '';
             document.getElementById('input-is-dca').checked = false;
+            document.getElementById('input-market-badge').textContent = '等待輸入代號...';
 
             refreshAllPrices();
         }
@@ -409,6 +331,7 @@
                 }
             }
             renderTables();
+            showToast("更新完成", "所有實時現價已更新", "success");
         }
 
         function formatMoney(hkdAmount) {
@@ -470,7 +393,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-800/40 transition-colors border-b border-gray-800";
 
-                const resolvedName = resolveStockName(h.symbol);
                 const displayCost = isUs ? formatMoney(h.avgCost * exchangeRate) : formatMoney(h.avgCost);
                 const displayPrice = hasValidPrice ? (isUs ? formatMoney(h.currentPrice * exchangeRate) : formatMoney(h.currentPrice)) : '<span class="text-rose-400">???</span>';
                 const displayMarketVal = hasValidPrice ? formatMoney(marketValHkd) : '<span class="text-rose-400">???</span>';
@@ -479,7 +401,7 @@
 
                 if (h.isDca) {
                     tr.innerHTML = `
-                        <td class="p-4 font-bold text-white"><span class="text-amber-400">港/美</span> <strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300">${resolvedName}</span></td>
+                        <td class="p-4 font-bold text-white"><span class="text-amber-400">月供</span> <strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300">${h.name}</span></td>
                         <td class="p-4 font-mono text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
                         <td class="p-4 text-right font-mono"><input type="number" value="${h.dcaDay || 15}" onchange="holdingsData[${index}].dcaDay=this.value" class="w-14 bg-gray-800 text-center text-white rounded"> 號</td>
                         <td class="p-4 text-right font-mono"><input type="number" value="${h.dcaAmount || 500}" onchange="holdingsData[${index}].dcaAmount=this.value" class="w-20 bg-gray-800 text-right text-amber-300 rounded"></td>
@@ -490,7 +412,7 @@
                     tbodyDca.appendChild(tr);
                 } else {
                     tr.innerHTML = `
-                        <td class="p-4 font-bold text-white"><strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300">${resolvedName}</span></td>
+                        <td class="p-4 font-bold text-white"><strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300">${h.name}</span></td>
                         <td class="p-4 font-mono text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
                         <td class="p-4 text-right font-mono">${displayCost}</td>
                         <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
