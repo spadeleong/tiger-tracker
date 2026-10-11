@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · VOO 現價修復版</title>
+    <title>Stocker PRO Lite · 完全修復穩定版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">VOO 現價修復 · 本地持久化與月供自動記帳系統</p>
+            <p class="text-xs text-gray-400">極速穩定版 · 本地持久化與月供自動記帳系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (已修復 VOO 現價問題)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -72,7 +72,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
                         <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (例: VOO, QQQ, AAPL, 2388)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onchange="fetchLivePriceIfNeeded(this.value)" placeholder="輸入代號 (例: VOO)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" placeholder="輸入代號 (例: VOO)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -233,7 +233,7 @@
         let cashReserve = 66800.53;
         let holdingsData = [];
 
-        // 擴充內建數據庫，加入 VOO, QQQ, NVDA 等美股熱門標的
+        // 擴充常見標的資料庫
         const stockDatabase = [
             { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', market: 'US', price: 520.50, lotSize: 1 },
             { symbol: 'QQQ', name: 'Invesco QQQ Trust', market: 'US', price: 480.20, lotSize: 1 },
@@ -252,8 +252,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        const STORAGE_KEY_HOLDINGS = 'stocker_pro_holdings_v4';
-        const STORAGE_KEY_CASH = 'stocker_pro_cash_v4';
+        const STORAGE_KEY_HOLDINGS = 'stocker_pro_holdings_v5';
+        const STORAGE_KEY_CASH = 'stocker_pro_cash_v5';
 
         function saveToLocalStorage() {
             try {
@@ -283,48 +283,6 @@
             }
         }
 
-        // 當輸入不在資料庫的代號時，自動嘗試由網絡獲取實時價格
-        async function fetchLivePriceIfNeeded(symbol) {
-            const cleanSymbol = symbol.toUpperCase().trim();
-            if (!cleanSymbol) return;
-
-            const found = stockDatabase.find(s => s.symbol === cleanSymbol);
-            if (found) {
-                selectStockOption(found);
-                return;
-            }
-
-            const isHK = /^\d+$/.test(cleanSymbol);
-            showToast("聯網查詢", `正在查詢 ${cleanSymbol} 實時價格...`, "info");
-
-            try {
-                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol}?interval=1d`);
-                const response = await fetch(proxyUrl);
-                const data = await response.json();
-                const meta = data.chart.result[0].meta;
-
-                const livePrice = meta.regularMarketPrice || meta.chartPreviousClose;
-                const longName = meta.longName || meta.shortName || cleanSymbol;
-                const marketType = isHK ? 'HK' : 'US';
-                const lot = isHK ? 1000 : 1;
-
-                const fetchedStock = {
-                    symbol: cleanSymbol,
-                    name: longName,
-                    market: marketType,
-                    price: parseFloat(livePrice.toFixed(2)),
-                    lotSize: lot
-                };
-
-                stockDatabase.push(fetchedStock);
-                selectStockOption(fetchedStock);
-                showToast("獲取成功", `已載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
-
-            } catch (error) {
-                showToast("提示", "未能獲得網絡現價，請手動填寫平均成本。", "warning");
-            }
-        }
-
         function handleSymbolFocus() {
             renderDropdownList(stockDatabase);
         }
@@ -336,218 +294,4 @@
 
             if (!cleanQuery) {
                 renderDropdownList(stockDatabase);
-                marketBadge.textContent = '等待輸入代號...';
-                marketBadge.className = 'text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = '初始持股數量 / 手數';
-                activeInputStock = null;
-                return;
-            }
-
-            const matches = stockDatabase.filter(s => 
-                s.symbol.toUpperCase().includes(cleanQuery) || 
-                s.name.toUpperCase().includes(cleanQuery)
-            );
-            
-            renderDropdownList(matches);
-
-            const isHK = /^\d+$/.test(cleanQuery);
-            if (isHK) {
-                marketBadge.textContent = '🇭🇰 港股 (一手單位)';
-                marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = '初始持股手數 (預設每手 1,000 股)';
-            } else {
-                marketBadge.textContent = '🇺🇸 美股';
-                marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = '初始持股數量 (股)';
-            }
-
-            const found = stockDatabase.find(s => s.symbol === cleanQuery);
-            if (found) {
-                selectStockOption(found);
-            }
-        }
-
-        function renderDropdownList(list) {
-            const dropdown = document.getElementById('symbol-dropdown');
-            dropdown.innerHTML = '';
-
-            if (list.length === 0) {
-                dropdown.classList.add('hidden');
-                return;
-            }
-
-            dropdown.classList.remove('hidden');
-            list.forEach(item => {
-                const div = document.createElement('div');
-                div.className = "px-3.5 py-2.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-200 border-b border-gray-800 flex justify-between items-center transition-colors";
-                const marketTag = item.market === 'HK' ? '<span class="text-amber-400 font-bold">港股</span>' : '<span class="text-blue-400 font-bold">美股</span>';
-                const lotInfo = item.market === 'HK' ? ` | 每手: ${item.lotSize}股` : '';
-                div.innerHTML = `<span>${marketTag} <strong class="text-white font-mono ml-1">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">現價: $${item.price}${lotInfo}</span>`;
-                div.onclick = () => selectStockOption(item);
-                dropdown.appendChild(div);
-            });
-        }
-
-        function selectStockOption(item) {
-            document.getElementById('input-symbol').value = item.symbol;
-            document.getElementById('input-cost').value = item.price;
-            activeInputStock = item;
-            document.getElementById('symbol-dropdown').classList.add('hidden');
-
-            const marketBadge = document.getElementById('input-market-badge');
-            const sharesLabel = document.getElementById('label-shares');
-            
-            if (item.market === 'HK') {
-                marketBadge.textContent = '🇭🇰 港股';
-                marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = `初始持股手數 (每手 ${item.lotSize} 股)`;
-            } else {
-                marketBadge.textContent = '🇺🇸 美股';
-                marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = '初始持股數量 (股)';
-            }
-
-            calculateTigerFee();
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#input-symbol') && !e.target.closest('#symbol-dropdown')) {
-                document.getElementById('symbol-dropdown').classList.add('hidden');
-            }
-        });
-
-        function calculateTigerFee() {
-            const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
-            const sharesInput = parseFloat(document.getElementById('input-shares').value) || 0;
-            const costInput = parseFloat(document.getElementById('input-cost').value) || 0;
-
-            if (!symbolInput || sharesInput <= 0 || costInput <= 0) {
-                document.getElementById('input-fee').value = '0.00';
-                return;
-            }
-
-            const isHK = activeInputStock ? activeInputStock.market === 'HK' : /^\d+$/.test(symbolInput);
-            const lotSize = activeInputStock ? activeInputStock.lotSize : (isHK ? 1000 : 1);
-            const totalShares = isHK ? sharesInput * lotSize : sharesInput;
-            const totalTurnover = totalShares * costInput;
-
-            let estimatedFee = 0;
-            if (isHK) {
-                const commission = Math.max(15, totalTurnover * 0.0003);
-                const platform = 15;
-                const regulatory = totalTurnover * 0.00133;
-                estimatedFee = commission + platform + regulatory;
-            } else {
-                const commission = Math.max(0.99, totalShares * 0.0049);
-                const platform = Math.max(1.00, totalShares * 0.005);
-                estimatedFee = commission + platform + 0.50;
-            }
-
-            document.getElementById('input-fee').value = estimatedFee.toFixed(2);
-        }
-
-        function handleAddStock(e) {
-            e.preventDefault();
-            const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
-            const inputVal = parseFloat(document.getElementById('input-shares').value);
-            const avgCost = parseFloat(document.getElementById('input-cost').value);
-            const fee = parseFloat(document.getElementById('input-fee').value) || 0;
-            const isDca = document.getElementById('input-is-dca').checked;
-
-            if (!symbolInput || isNaN(inputVal) || isNaN(avgCost)) {
-                showToast("輸入錯誤", "請填寫完整代號與數值！", "error");
-                return;
-            }
-
-            const market = activeInputStock ? activeInputStock.market : (/^\d+$/.test(symbolInput) ? 'HK' : 'US');
-            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: avgCost, lotSize: 1000 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: avgCost, lotSize: 1 });
-
-            const existing = holdingsData.find(h => h.symbol === stockInfo.symbol && h.market === market && h.isDca === isDca);
-
-            if (existing) {
-                existing.hands += inputVal;
-                existing.avgCost = ((existing.hands - inputVal) * existing.avgCost + inputVal * avgCost) / existing.hands;
-                existing.fee += fee;
-                existing.currentPrice = stockInfo.price || avgCost;
-                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.symbol} 中。`, "success");
-            } else {
-                holdingsData.push({
-                    symbol: stockInfo.symbol,
-                    name: stockInfo.name,
-                    market: market,
-                    hands: inputVal,
-                    lotSize: stockInfo.lotSize || 1,
-                    avgCost: avgCost,
-                    currentPrice: stockInfo.price || avgCost,
-                    fee: fee,
-                    isDca: isDca,
-                    dcaDay: 15,
-                    dcaAmount: 500
-                });
-                showToast("新增成功", `成功加入 ${stockInfo.symbol} (${stockInfo.name})！`, "success");
-            }
-
-            document.getElementById('input-symbol').value = '';
-            document.getElementById('input-shares').value = '';
-            document.getElementById('input-cost').value = '';
-            document.getElementById('input-fee').value = '';
-            document.getElementById('input-is-dca').checked = false;
-            document.getElementById('input-market-badge').textContent = '等待輸入代號...';
-            document.getElementById('input-market-badge').className = 'text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold';
-            document.getElementById('label-shares').textContent = '初始持股數量 / 手數';
-            activeInputStock = null;
-
-            saveToLocalStorage();
-            renderTables();
-        }
-
-        function updateDcaSetting(globalIndex, field, value) {
-            const val = parseFloat(value);
-            if (isNaN(val)) return;
-            holdingsData[globalIndex][field] = val;
-            saveToLocalStorage();
-        }
-
-        function executeDcaExecution() {
-            const dcaItems = holdingsData.filter(h => h.isDca);
-            if (dcaItems.length === 0) {
-                showToast("提示", "目前沒有設定任何月供計劃！", "warning");
-                return;
-            }
-
-            let totalSpentHkd = 0;
-            dcaItems.forEach(h => {
-                const isUs = h.market === 'US';
-                const amount = h.dcaAmount || 500;
-                const currentPrice = h.currentPrice || h.avgCost;
-
-                let addedSharesOrHands = 0;
-                let actualCostHkd = isUs ? amount * exchangeRate : amount;
-
-                if (isUs) {
-                    addedSharesOrHands = parseFloat((amount / currentPrice).toFixed(4));
-                } else {
-                    const costPerLot = currentPrice * h.lotSize;
-                    addedSharesOrHands = parseFloat((amount / costPerLot).toFixed(2));
-                }
-
-                const oldTotalShares = isUs ? (h.hands - addedSharesOrHands) : (h.hands - addedSharesOrHands) * h.lotSize;
-                const newTotalShares = isUs ? h.hands + addedSharesOrHands : (h.hands + addedSharesOrHands) * h.lotSize;
-                
-                const totalOldCost = oldTotalShares * h.avgCost;
-                const totalNewPurchase = (isUs ? addedSharesOrHands : addedSharesOrHands * h.lotSize) * currentPrice;
-                
-                if (newTotalShares > 0) {
-                    h.avgCost = (totalOldCost + totalNewPurchase) / (isUs ? newTotalShares : (newTotalShares / h.lotSize));
-                }
-
-                h.hands += addedSharesOrHands;
-                totalSpentHkd += actualCostHkd;
-            });
-
-            cashReserve -= totalSpentHkd;
-            if (cashReserve < 0) cashReserve = 0;
-
-            saveToLocalStorage();
-            renderTables();
-            showToast("月供記帳成功",
+                marketBadge.textContent = '
