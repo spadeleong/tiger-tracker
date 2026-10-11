@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 轉折點一 (雲端同步記錄版)</title>
+    <title>Stocker PRO Lite · 轉折點一 (完整升級版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、公式名稱、雲端同步持久化系統</p>
+            <p class="text-xs text-gray-400">Google 試算表實時自動聯網、試算表公式名稱、雲端同步持久化系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -452,17 +452,30 @@
             renderTables();
         }
 
+        // 🌟 升級版：支援絕對數額與加減調整的現金管理
         function adjustCash() {
-            const input = prompt(`請輸入要增加（正數）或減少（負數）的現金金額（HKD）：\n目前現金: HK$ ${cashReserve.toLocaleString(undefined, {minimumFractionDigits: 2})}`, "1000");
+            const input = prompt(`請輸入新的現金金額，或輸入變動數額（支援加減）：\n例如直接輸入「50000」設為指定金額，或輸入「+1000」/「-500」進行增減。\n目前現金: HK$ ${cashReserve.toLocaleString(undefined, {minimumFractionDigits: 2})}`, cashReserve);
+            
             if (input === null) return;
-            const delta = parseFloat(input);
+            const cleanInput = input.trim();
+            if (cleanInput === "") return;
 
-            if (isNaN(delta)) {
-                showToast("錯誤", "請輸入有效的數字！", "error");
-                return;
+            if (cleanInput.startsWith('+') || cleanInput.startsWith('-')) {
+                const delta = parseFloat(cleanInput);
+                if (isNaN(delta)) {
+                    showToast("錯誤", "請輸入有效的數字！", "error");
+                    return;
+                }
+                cashReserve += delta;
+            } else {
+                const absoluteVal = parseFloat(cleanInput);
+                if (isNaN(absoluteVal)) {
+                    showToast("錯誤", "請輸入有效的數字！", "error");
+                    return;
+                }
+                cashReserve = absoluteVal;
             }
 
-            cashReserve += delta;
             if (cashReserve < 0) cashReserve = 0;
 
             renderTables();
@@ -720,6 +733,54 @@
 
         function handleDragEnd(e) { this.classList.remove('dragging'); }
 
+        // 🌟 下拉刷新（Pull-to-Refresh）手機觸控邏輯
+        let touchStartY = 0;
+        let isPulling = false;
+
+        window.addEventListener('touchstart', function(e) {
+            if (window.scrollY === 0) {
+                touchStartY = e.touches[0].clientY;
+                isPulling = true;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', function(e) {
+            if (!isPulling) return;
+            const currentY = e.touches[0].clientY;
+            const pullDistance = currentY - touchStartY;
+
+            if (pullDistance > 80 && window.scrollY === 0) {
+                showPullRefreshIndicator(true);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', function(e) {
+            if (!isPulling) return;
+            isPulling = false;
+            
+            const pullDistance = e.changedTouches[0].clientY - touchStartY;
+            if (pullDistance > 80 && window.scrollY === 0) {
+                showPullRefreshIndicator(false);
+                showToast("正在重新整理", "正在重新加載雲端數據...", "info");
+                loadCloudHoldings();
+            } else {
+                showPullRefreshIndicator(false);
+            }
+        });
+
+        function showPullRefreshIndicator(show) {
+            let indicator = document.getElementById('pull-refresh-indicator');
+            if (!indicator && show) {
+                indicator = document.createElement('div');
+                indicator.id = 'pull-refresh-indicator';
+                indicator.className = "fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-amber-400 text-gray-950 px-4 py-2 rounded-full text-xs font-bold shadow-2xl flex items-center gap-2 transition-all";
+                indicator.innerHTML = `<span class="animate-spin">🔄</span> 鬆開手即可自動刷新...`;
+                document.body.appendChild(indicator);
+            } else if (indicator && !show) {
+                indicator.remove();
+            }
+        }
+
         function showToast(title, text, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -729,7 +790,7 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // 🌟 網頁啟動時自動加載雲端數據
+        // 網頁啟動時自動加載雲端數據
         window.onload = function() {
             loadCloudHoldings();
         };
