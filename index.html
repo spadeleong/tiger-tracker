@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 雙源智能自動備份系統</title>
+    <title>Stocker PRO Lite · 5重智能防護系統</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">雙源自動備份聯網、月供排程記帳與多幣別切換系統</p>
+            <p class="text-xs text-gray-400">5重智能數據源切換、月供排程記帳與多幣別切換系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (雙源自動備份聯網)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (5重智能數據源聯網)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,8 +71,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援雙源智能切換)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataWithFallback(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援5重自動輪詢)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataWith5Sources(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -248,8 +248,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        // 雙源自動備份抓取機制 (Source 1 失敗時自動切換去 Source 2)
-        async function fetchStockDataWithFallback(symbol) {
+        // 5重智能數據源輪詢切換機制
+        async function fetchStockDataWith5Sources(symbol) {
             const cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
@@ -262,75 +262,67 @@
             const isHK = /^\d+$/.test(cleanSymbol);
             const ticker = isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol;
 
-            showToast("聯網查詢", `正在尋找 ${cleanSymbol} 實時現價...`, "info");
+            showToast("聯網查詢", `正在透過 5 重備用源尋找 ${cleanSymbol}...`, "info");
 
             let fetchedStock = null;
 
-            // 【第一源】嘗試第一套財經 API
-            try {
-                const url1 = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`);
-                const res1 = await fetch(url1);
-                const data1 = await res1.json();
-                const meta1 = data1.chart.result[0].meta;
-                const price1 = meta1.regularMarketPrice || meta1.chartPreviousClose;
-                const name1 = meta1.longName || meta1.shortName || cleanSymbol;
+            // 依序嘗試 5 個不同的公開數據源及代理管道
+            const urls = [
+                `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
+                `https://corsproxy.io/?` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
+                `https://api.codetabs.com/v1/proxy?quest=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`),
+                `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`,
+                `https://lite-finance.p.rapidapi.com/price?symbol=${ticker}` // 最終防護源
+            ];
 
-                if (price1) {
-                    fetchedStock = {
-                        symbol: cleanSymbol,
-                        name: name1,
-                        market: isHK ? 'HK' : 'US',
-                        price: parseFloat(price1.toFixed(2)),
-                        lotSize: isHK ? 1000 : 1
-                    };
-                }
-            } catch (err1) {
-                console.warn("第一源失敗，準備切換備用源...", err1);
-            }
-
-            // 【第二源】如果第一源失敗，自動切換至備用財經數據源
-            if (!fetchedStock) {
+            for (let i = 0; i < urls.length; i++) {
                 try {
-                    showToast("備用源切換", `第一源未回應，正在透過備用源尋找 ${cleanSymbol}...`, "warning");
-                    const url2 = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`;
-                    // 透過 CORS 代理請求備用源
-                    const proxyUrl2 = `https://api.allorigins.win/raw?url=` + encodeURIComponent(url2);
-                    const res2 = await fetch(proxyUrl2);
-                    const data2 = await res2.json();
-                    const priceObj = data2.quoteSummary.result[0].price;
+                    const res = await fetch(urls[i]);
+                    const data = await res.json();
+                    
+                    let price = null;
+                    let name = cleanSymbol;
 
-                    const price2 = priceObj.regularMarketPrice.raw;
-                    const name2 = priceObj.longName || priceObj.shortName || cleanSymbol;
+                    if (data.chart && data.chart.result) {
+                        const meta = data.chart.result[0].meta;
+                        price = meta.regularMarketPrice || meta.chartPreviousClose;
+                        name = meta.longName || meta.shortName || cleanSymbol;
+                    } else if (data.quoteSummary) {
+                        const priceObj = data.quoteSummary.result[0].price;
+                        price = priceObj.regularMarketPrice.raw;
+                        name = priceObj.longName || priceObj.shortName || cleanSymbol;
+                    }
 
-                    if (price2) {
+                    if (price && !isNaN(price)) {
                         fetchedStock = {
                             symbol: cleanSymbol,
-                            name: name2,
+                            name: name,
                             market: isHK ? 'HK' : 'US',
-                            price: parseFloat(price2.toFixed(2)),
+                            price: parseFloat(price.toFixed(2)),
                             lotSize: isHK ? 1000 : 1
                         };
+                        break; // 成功找到即跳出迴圈
                     }
-                } catch (err2) {
-                    console.warn("第二源亦失敗", err2);
+                } catch (e) {
+                    console.warn(`第 ${i + 1} 個數據源嘗試失敗，自動切換下一個...`, e);
                 }
             }
 
-            // 如果雙源皆成功，載入數據；若全部失敗則進入手動模式
+            // 如果 5 個源都徹底找不到，設定為 '???' 而非 100
             if (fetchedStock) {
                 stockDatabase.push(fetchedStock);
                 selectStockOption(fetchedStock);
-                showToast("獲取成功", `已成功載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
+                showToast("獲取成功", `已成功由第 ${fetchedStock.sourceIndex || '多重'} 源載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
             } else {
                 const fallbackStock = {
                     symbol: cleanSymbol,
                     name: cleanSymbol,
                     market: isHK ? 'HK' : 'US',
-                    price: 100.00,
+                    price: '???', // 嚴格顯示 ???
                     lotSize: isHK ? 1000 : 1
                 };
                 selectStockOption(fallbackStock);
-                showToast("提示", `多源均未能取得現價，已轉為手動填入模式。`, "warning");
+                showToast("提示", `已嘗試 5 個數據源均未能取得現價，現價已設為 ???，請手動輸入成本與現價。`, "warning");
             }
         }
 
@@ -370,6 +362,7 @@
         }
 
         function formatMoney(hkdAmount) {
+            if (isNaN(hkdAmount)) return '???';
             let val = hkdAmount;
             let symbol = baseCurrency === 'HKD' ? 'HK$ ' : 'US$ ';
 
@@ -439,7 +432,7 @@
 
         function selectStockOption(item) {
             document.getElementById('input-symbol').value = item.symbol;
-            document.getElementById('input-cost').value = item.price;
+            document.getElementById('input-cost').value = item.price === '???' ? '' : item.price;
             activeInputStock = item;
             document.getElementById('symbol-dropdown').classList.add('hidden');
 
@@ -506,7 +499,7 @@
             }
 
             const market = activeInputStock ? activeInputStock.market : (/^\d+$/.test(symbolInput) ? 'HK' : 'US');
-            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: avgCost, lotSize: 1000 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: avgCost, lotSize: 1 });
+            const stockInfo = activeInputStock || (market === 'HK' ? { symbol: symbolInput, name: `港股 ${symbolInput}`, market: 'HK', price: '???', lotSize: 1000 } : { symbol: symbolInput, name: symbolInput, market: 'US', price: '???', lotSize: 1 });
 
             const existing = holdingsData.find(h => h.symbol === stockInfo.symbol && h.market === market && h.isDca === isDca);
 
@@ -523,7 +516,7 @@
                     hands: inputVal,
                     lotSize: stockInfo.lotSize || 1,
                     avgCost: avgCost,
-                    currentPrice: stockInfo.price || avgCost,
+                    currentPrice: stockInfo.price,
                     fee: fee,
                     isDca: isDca,
                     dcaDay: 15,
@@ -552,9 +545,9 @@
         }
 
         function executeDcaExecution() {
-            const dcaItems = holdingsData.filter(h => h.isDca);
+            const dcaItems = holdingsData.filter(h => h.isDca && !isNaN(h.currentPrice));
             if (dcaItems.length === 0) {
-                showToast("提示", "目前沒有設定任何月供計劃！", "warning");
+                showToast("提示", "目前沒有有效的月供計劃（部分現價為 ??? 無法自動扣款）！", "warning");
                 return;
             }
 
@@ -623,10 +616,12 @@
             else if (category === 'DCA') targetList = holdingsData.filter(h => h.isDca);
 
             targetList.sort((a, b) => {
+                const priceA = isNaN(a.currentPrice) ? 0 : a.currentPrice;
+                const priceB = isNaN(b.currentPrice) ? 0 : b.currentPrice;
                 const totalSharesA = a.market === 'HK' ? a.hands * a.lotSize : a.hands;
                 const totalSharesB = b.market === 'HK' ? b.hands * b.lotSize : b.hands;
-                const valA = totalSharesA * a.currentPrice * (a.market === 'US' ? exchangeRate : 1);
-                const valB = totalSharesB * b.currentPrice * (b.market === 'US' ? exchangeRate : 1);
+                const valA = totalSharesA * priceA * (a.market === 'US' ? exchangeRate : 1);
+                const valB = totalSharesB * priceB * (b.market === 'US' ? exchangeRate : 1);
                 return valB - valA;
             });
 
@@ -689,12 +684,16 @@
             holdingsData.forEach((h, globalIndex) => {
                 const isUs = h.market === 'US';
                 const actualShares = isUs ? h.hands : h.hands * h.lotSize;
-                const marketValRaw = actualShares * h.currentPrice;
+                const hasValidPrice = !isNaN(h.currentPrice);
+                
+                const marketValRaw = hasValidPrice ? actualShares * h.currentPrice : 0;
                 const marketValHkd = isUs ? marketValRaw * exchangeRate : marketValRaw;
                 const costValHkd = isUs ? (actualShares * h.avgCost) * exchangeRate : (actualShares * h.avgCost);
-                const pnlHkd = marketValHkd - costValHkd - (isUs ? h.fee * exchangeRate : h.fee);
+                const pnlHkd = hasValidPrice ? marketValHkd - costValHkd - (isUs ? h.fee * exchangeRate : h.fee) : NaN;
 
-                totalEquityHkd += marketValHkd;
+                if (hasValidPrice) {
+                    totalEquityHkd += marketValHkd;
+                }
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-800/40 transition-colors border-b border-gray-800";
@@ -714,9 +713,9 @@
                 }
 
                 const displayCost = isUs ? formatMoney(h.avgCost * exchangeRate) : formatMoney(h.avgCost);
-                const displayPrice = isUs ? formatMoney(h.currentPrice * exchangeRate) : formatMoney(h.currentPrice);
-                const displayMarketVal = formatMoney(marketValHkd);
-                const displayPnl = (pnlHkd >= 0 ? '+' : '') + formatMoney(Math.abs(pnlHkd));
+                const displayPrice = hasValidPrice ? (isUs ? formatMoney(h.currentPrice * exchangeRate) : formatMoney(h.currentPrice)) : '<span class="text-rose-400 font-bold">???</span>';
+                const displayMarketVal = hasValidPrice ? formatMoney(marketValHkd) : '<span class="text-rose-400 font-bold">???</span>';
+                const displayPnl = !isNaN(pnlHkd) ? ((pnlHkd >= 0 ? '+' : '') + formatMoney(Math.abs(pnlHkd))) : '<span class="text-rose-400 font-bold">???</span>';
                 const pnlColor = pnlHkd >= 0 ? 'text-emerald-400' : 'text-rose-400';
 
                 if (h.isDca) {
@@ -736,7 +735,7 @@
                         <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
                         <td class="p-4 text-right font-mono">
                             <span class="font-bold">${displayMarketVal}</span><br>
-                            <span class="${pnlColor}">${displayPnl}</span>
+                            <span class="${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</span>
                         </td>
                         <td class="p-4 text-center">
                             <div class="flex items-center justify-center gap-1.5">
@@ -756,7 +755,7 @@
                         <td class="p-4 text-right font-mono">${displayCost}<br><span class='text-[9px] text-gray-500'>費: ${h.fee.toFixed(2)}</span></td>
                         <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
                         <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
-                        <td class="p-4 text-right font-mono ${pnlColor}">${displayPnl}</td>
+                        <td class="p-4 text-right font-mono ${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</td>
                         <td class="p-4 text-center">
                             <div class="flex items-center justify-center gap-1.5">
                                 <button onclick="adjustShares(${globalIndex})" class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-bold">📊 調整</button>
