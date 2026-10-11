@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 智能名稱對應版</title>
+    <title>Stocker PRO Lite · 強效中文名稱版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">Google 試算表自動聯網、股票全稱智能識別與資產管理系統</p>
+            <p class="text-xs text-gray-400">Google 試算表自動聯網、強效股票中文名稱識別與資產管理系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (自動識別名稱與聯網)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (自動中文識別與聯網)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,7 +71,7 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援自動帶出公司全名)</label>
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援自動帶出中文全名)</label>
                         <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromGoogleSheets(this.value)" placeholder="輸入代號 (例: 9988, HIMS)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
@@ -247,15 +247,25 @@
 
         const GOOGLE_API_URL = "https://script.google.com/macros/s/AKfycbwBMDxoBrxdXdAjao2JdB6f9FVAoVM-8HI4IdSPDANPOdclrTTPGEGfD3LxjWgQEtL1Wg/exec";
 
-        // 🌟 內置常用股票全稱對應庫（你可以隨時在下面加入更多你常買的股票）
+        // 🌟 強效擴充中文股票名稱字典（支援各種寫法，包括 4 位數字、帶 .HK 或不帶）
         const stockNameMapping = {
             '9988.HK': '阿里巴巴-W',
+            '9988': '阿里巴巴-W',
             '0700.HK': '騰訊控股',
+            '700.HK': '騰訊控股',
+            '0700': '騰訊控股',
+            '700': '騰訊控股',
             '2800.HK': '盈富基金',
+            '2800': '盈富基金',
             '2388.HK': '中銀香港',
+            '2388': '中銀香港',
             '0005.HK': '滙豐控股',
+            '5.HK': '滙豐控股',
+            '0005': '滙豐控股',
             '3690.HK': '美團-W',
+            '3690': '美團-W',
             '1810.HK': '小米集團-W',
+            '1810': '小米集團-W',
             'AAPL': '蘋果公司 (Apple)',
             'TSLA': '特斯拉 (Tesla)',
             'HIMS': 'Hims & Hers Health',
@@ -308,29 +318,41 @@
             }
         }
 
-        // 自動識別股票全稱的輔助函數
+        // 🌟 強效中文全稱識別函數（支援純數字、補足 4 位、比對字典）
         function getStockFullName(symbol) {
             let clean = symbol.toUpperCase().trim();
-            if (/^\d+$/.test(clean)) {
-                clean = clean.padStart(4, '0') + '.HK';
-            }
+            
+            // 如果直接在字典內，立即返回
             if (stockNameMapping[clean]) {
                 return stockNameMapping[clean];
             }
-            // 如果對應庫沒有，嘗試去除 .HK 尋找
-            let base = clean.replace('.HK', '');
-            if (stockNameMapping[base]) {
-                return stockNameMapping[base];
+
+            // 如果全是數字，嘗試補足 4 位數或加上 .HK 比對
+            if (/^\d+$/.test(clean)) {
+                let padded = clean.padStart(4, '0');
+                if (stockNameMapping[padded]) return stockNameMapping[padded];
+                if (stockNameMapping[padded + '.HK']) return stockNameMapping[padded + '.HK'];
             }
-            return clean; // 預設回傳代號作為名稱
+
+            let base = clean.replace('.HK', '');
+            if (stockNameMapping[base]) return stockNameMapping[base];
+            if (stockNameMapping[base.padStart(4, '0')]) return stockNameMapping[base.padStart(4, '0')];
+
+            // 如果字典完全沒有，自動為港股數字加上預設名稱或顯示代號
+            if (/^\d+$/.test(clean)) {
+                return `港股 (${clean.padStart(4, '0')})`;
+            }
+
+            return clean;
         }
 
         async function fetchStockDataFromGoogleSheets(symbol) {
             let cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
+            let querySymbol = cleanSymbol;
             if (/^\d+$/.test(cleanSymbol)) {
-                cleanSymbol = cleanSymbol.padStart(4, '0') + '.HK';
+                querySymbol = cleanSymbol.padStart(4, '0') + '.HK';
             }
 
             const stockName = getStockFullName(cleanSymbol);
@@ -341,10 +363,12 @@
             try {
                 updateProgress(60, `<span class="animate-spin">🔄</span> 正在同步試算表實時現價...`);
                 
-                const response = await fetch(`${GOOGLE_API_URL}?symbol=${encodeURIComponent(cleanSymbol)}`);
+                const response = await fetch(`${GOOGLE_API_URL}?symbol=${encodeURIComponent(querySymbol)}`);
                 const data = await response.json();
 
-                if (data && data[cleanSymbol] && !isNaN(data[cleanSymbol].price)) {
+                if (data && data[querySymbol] && !isNaN(data[querySymbol].price)) {
+                    fetchedPrice = data[querySymbol].price;
+                } else if (data && data[cleanSymbol] && !isNaN(data[cleanSymbol].price)) {
                     fetchedPrice = data[cleanSymbol].price;
                 } else if (data && data[cleanSymbol.replace('.HK', '')] && !isNaN(data[cleanSymbol.replace('.HK', '')].price)) {
                     fetchedPrice = data[cleanSymbol.replace('.HK', '')].price;
@@ -353,29 +377,30 @@
                 console.warn("無法連接 Google 試算表 API", err);
             }
 
-            const isHK = cleanSymbol.endsWith('.HK');
+            const isHK = querySymbol.endsWith('.HK') || /^\d+$/.test(cleanSymbol);
+            const standardizedSymbol = isHK ? (cleanSymbol.replace('.HK', '').padStart(4, '0') + '.HK') : cleanSymbol;
 
             if (fetchedPrice !== null) {
                 const fetchedStock = {
-                    symbol: cleanSymbol,
+                    symbol: standardizedSymbol,
                     name: stockName,
                     market: isHK ? 'HK' : 'US',
                     price: parseFloat(fetchedPrice.toFixed(2)),
-                    lotSize: isHK ? (cleanSymbol === '9988.HK' ? 100 : 500) : 1
+                    lotSize: isHK ? (standardizedSymbol === '9988.HK' ? 100 : 500) : 1
                 };
                 selectStockOption(fetchedStock);
                 updateProgress(100, `✅ 成功取得 ${stockName} 現價: ${fetchedStock.price}`, true);
-                showToast("獲取成功", `已成功取得 ${stockName} (${cleanSymbol}) 現價`, "success");
+                showToast("獲取成功", `已成功取得 ${stockName} 現價`, "success");
             } else {
                 const fallbackStock = {
-                    symbol: cleanSymbol,
+                    symbol: standardizedSymbol,
                     name: stockName,
                     market: isHK ? 'HK' : 'US',
                     price: '???',
                     lotSize: isHK ? 500 : 1
                 };
                 selectStockOption(fallbackStock);
-                updateProgress(100, `⚠️ 試算表暫未取得價格，已設為 ???`, false);
+                updateProgress(100, `⚠️ 試算表暫未取得價格，現價設為 ???`, false);
                 showToast("提示", `已帶出名稱「${stockName}」，現價設為 ???`, "warning");
             }
         }
@@ -453,11 +478,13 @@
             renderDropdownList(matches);
 
             if (/^\d+$/.test(cleanQuery)) {
-                marketBadge.textContent = '🇭🇰 港股 (一手單位)';
+                const name = getStockFullName(cleanQuery);
+                marketBadge.textContent = `🇭🇰 港股 (${name})`;
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股手數 (預設每手 500 股)';
             } else {
-                marketBadge.textContent = '🇺🇸 美股';
+                const name = getStockFullName(cleanQuery);
+                marketBadge.textContent = `🇺🇸 美股 (${name})`;
                 marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股數量 (股)';
             }
@@ -519,7 +546,7 @@
 
             if (!symbolInput || sharesInput <= 0 || costInput <= 0) return;
 
-            const isHK = activeInputStock ? activeInputStock.market === 'HK' : symbolInput.endsWith('.HK');
+            const isHK = activeInputStock ? activeInputStock.market === 'HK' : (symbolInput.endsWith('.HK') || /^\d+$/.test(symbolInput));
             const lotSize = activeInputStock ? activeInputStock.lotSize : (isHK ? 500 : 1);
             const totalShares = isHK ? sharesInput * lotSize : sharesInput;
             const totalTurnover = totalShares * costInput;
@@ -556,9 +583,9 @@
                 return;
             }
 
-            const isHK = symbolInput.endsWith('.HK');
+            const isHK = symbolInput.endsWith('.HK') || /^\d+$/.test(symbolInput);
             const stockName = getStockFullName(symbolInput);
-            const stockInfo = activeInputStock || { symbol: symbolInput, name: stockName, market: isHK ? 'HK' : 'US', price: '???', lotSize: isHK ? 500 : 1 };
+            const stockInfo = activeInputStock || { symbol: symbolInput, name: stockName, market: isHK ? 'HK' : 'US', price: '???', lotSize: isHK ? (symbolInput.includes('9988') ? 100 : 500) : 1 };
 
             const existing = holdingsData.find(h => h.symbol === stockInfo.symbol && h.isDca === isDca);
 
@@ -566,11 +593,11 @@
                 existing.hands += inputVal;
                 existing.avgCost = ((existing.hands - inputVal) * existing.avgCost + inputVal * avgCost) / existing.hands;
                 existing.fee += fee;
-                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.name} (${stockInfo.symbol}) 中。`, "success");
+                showToast("持股已合併", `已成功將新數值合拼入現有 ${stockInfo.name} 中。`, "success");
             } else {
                 holdingsData.push({
                     symbol: stockInfo.symbol,
-                    name: stockInfo.name,
+                    name: stockName,
                     market: isHK ? 'HK' : 'US',
                     hands: inputVal,
                     lotSize: stockInfo.lotSize || (isHK ? 500 : 1),
@@ -581,7 +608,7 @@
                     dcaDay: 15,
                     dcaAmount: 500
                 });
-                showToast("新增成功", `成功加入 ${stockInfo.name} (${stockInfo.symbol})！`, "success");
+                showToast("新增成功", `成功加入 ${stockName}！`, "success");
             }
 
             document.getElementById('input-symbol').value = '';
