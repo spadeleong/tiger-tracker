@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · Google 財經實時聯網版</title>
+    <title>Stocker PRO Lite · 雙源智能自動備份系統</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">Google 財經數據聯網、月供自動排程記帳與多幣別切換系統</p>
+            <p class="text-xs text-gray-400">雙源自動備份聯網、月供排程記帳與多幣別切換系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (Google 財經數據聯網)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (雙源自動備份聯網)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,8 +71,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援 Google 財經聯網)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataFromGoogleFinance(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (支援雙源智能切換)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onblur="fetchStockDataWithFallback(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -248,8 +248,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        // 透過 Google 財經數據接口獲取實時價格
-        async function fetchStockDataFromGoogleFinance(symbol) {
+        // 雙源自動備份抓取機制 (Source 1 失敗時自動切換去 Source 2)
+        async function fetchStockDataWithFallback(symbol) {
             const cleanSymbol = symbol.toUpperCase().trim();
             if (!cleanSymbol) return;
 
@@ -260,36 +260,68 @@
             }
 
             const isHK = /^\d+$/.test(cleanSymbol);
-            // 港股對應 Google Finance 格式如 2388:HK 或 0700:HK
-            const googleTicker = isHK ? (cleanSymbol.padStart(4, '0') + ':HK') : cleanSymbol;
+            const ticker = isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol;
 
-            showToast("Google 財經聯網", `正在向 Google 查詢 ${cleanSymbol}...`, "info");
+            showToast("聯網查詢", `正在尋找 ${cleanSymbol} 實時現價...`, "info");
 
+            let fetchedStock = null;
+
+            // 【第一源】嘗試第一套財經 API
             try {
-                // 使用 Google 官方公開財經數據接口 (等同 GOOGLEFINANCE 底層數據源)
-                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol}?interval=1d`);
-                const response = await fetch(proxyUrl);
-                const data = await response.json();
-                const meta = data.chart.result[0].meta;
+                const url1 = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d`);
+                const res1 = await fetch(url1);
+                const data1 = await res1.json();
+                const meta1 = data1.chart.result[0].meta;
+                const price1 = meta1.regularMarketPrice || meta1.chartPreviousClose;
+                const name1 = meta1.longName || meta1.shortName || cleanSymbol;
 
-                const livePrice = meta.regularMarketPrice || meta.chartPreviousClose;
-                const longName = meta.longName || meta.shortName || cleanSymbol;
-                const marketType = isHK ? 'HK' : 'US';
-                const lot = isHK ? 1000 : 1;
+                if (price1) {
+                    fetchedStock = {
+                        symbol: cleanSymbol,
+                        name: name1,
+                        market: isHK ? 'HK' : 'US',
+                        price: parseFloat(price1.toFixed(2)),
+                        lotSize: isHK ? 1000 : 1
+                    };
+                }
+            } catch (err1) {
+                console.warn("第一源失敗，準備切換備用源...", err1);
+            }
 
-                const fetchedStock = {
-                    symbol: cleanSymbol,
-                    name: longName,
-                    market: marketType,
-                    price: parseFloat(livePrice.toFixed(2)),
-                    lotSize: lot
-                };
+            // 【第二源】如果第一源失敗，自動切換至備用財經數據源
+            if (!fetchedStock) {
+                try {
+                    showToast("備用源切換", `第一源未回應，正在透過備用源尋找 ${cleanSymbol}...`, "warning");
+                    const url2 = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`;
+                    // 透過 CORS 代理請求備用源
+                    const proxyUrl2 = `https://api.allorigins.win/raw?url=` + encodeURIComponent(url2);
+                    const res2 = await fetch(proxyUrl2);
+                    const data2 = await res2.json();
+                    const priceObj = data2.quoteSummary.result[0].price;
 
+                    const price2 = priceObj.regularMarketPrice.raw;
+                    const name2 = priceObj.longName || priceObj.shortName || cleanSymbol;
+
+                    if (price2) {
+                        fetchedStock = {
+                            symbol: cleanSymbol,
+                            name: name2,
+                            market: isHK ? 'HK' : 'US',
+                            price: parseFloat(price2.toFixed(2)),
+                            lotSize: isHK ? 1000 : 1
+                        };
+                    }
+                } catch (err2) {
+                    console.warn("第二源亦失敗", err2);
+                }
+            }
+
+            // 如果雙源皆成功，載入數據；若全部失敗則進入手動模式
+            if (fetchedStock) {
                 stockDatabase.push(fetchedStock);
                 selectStockOption(fetchedStock);
                 showToast("獲取成功", `已成功載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
-
-            } catch (error) {
+            } else {
                 const fallbackStock = {
                     symbol: cleanSymbol,
                     name: cleanSymbol,
@@ -298,7 +330,7 @@
                     lotSize: isHK ? 1000 : 1
                 };
                 selectStockOption(fallbackStock);
-                showToast("提示", `未能自動聯網抓取現價，已切換為手動填入模式。`, "warning");
+                showToast("提示", `多源均未能取得現價，已轉為手動填入模式。`, "warning");
             }
         }
 
