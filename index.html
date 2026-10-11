@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 轉折點一 (完整升級版)</title>
+    <title>Stocker PRO Lite · 轉折點一 (表格內直接編輯版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -141,7 +141,7 @@
                         <tr>
                             <th class="p-4 w-10 text-center">拖曳</th>
                             <th class="p-4">代號 / 名稱</th>
-                            <th class="p-4">持股手數 (每手股數)</th>
+                            <th class="p-4">持股手數</th>
                             <th class="p-4 text-right">平均成本</th>
                             <th class="p-4 text-right">實時現價</th>
                             <th class="p-4 text-right">市值</th>
@@ -250,6 +250,9 @@
         let draggedIndex = null;
         let draggedCategory = null;
         let activeInputStock = null;
+        
+        // 記錄正在編輯的行索引 (-1 代表無)
+        let editingIndex = -1;
 
         function updateProgress(percent, text, isSuccess = true) {
             const container = document.getElementById('search-progress-container');
@@ -579,34 +582,50 @@
             showToast("一鍵排版", `該表格已按市值排序！`, "success");
         }
 
-        function adjustShares(globalIndex) {
+        // 🌟 核心新功能：切換編輯狀態
+        function toggleEditRow(globalIndex) {
+            if (editingIndex === globalIndex) {
+                // 如果原本正在編輯這一行，代表點擊了「儲存」
+                saveRowData(globalIndex);
+            } else {
+                // 切換到編輯這一行
+                editingIndex = globalIndex;
+                renderTables();
+            }
+        }
+
+        // 儲存行數據
+        function saveRowData(globalIndex) {
             const h = holdingsData[globalIndex];
-            const unitName = h.market === 'HK' ? '手數' : '股數';
-            const input = prompt(`請輸入 ${h.name} (${h.symbol}) 要變動的${unitName}：\n（正數增加，負數減少）`, "1");
-            if (input === null) return;
-            const delta = parseFloat(input);
-
-            if (isNaN(delta) || delta === 0) {
-                showToast("錯誤", "請輸入有效數字！", "error");
-                return;
+            const handsInput = document.getElementById(`edit-hands-${globalIndex}`);
+            const costInput = document.getElementById(`edit-cost-${globalIndex}`);
+            
+            if (handsInput) {
+                const val = parseFloat(handsInput.value);
+                if (!isNaN(val) && val >= 0) h.hands = val;
+            }
+            if (costInput) {
+                const val = parseFloat(costInput.value);
+                if (!isNaN(val) && val >= 0) h.avgCost = val;
             }
 
-            h.hands += delta;
-            if (h.hands <= 0) {
-                if (confirm(`持股已歸零，是否將 ${h.name} 移除？`)) {
-                    holdingsData.splice(globalIndex, 1);
-                } else {
-                    h.hands = 0;
-                }
+            if (h.isDca) {
+                const dcaDayInput = document.getElementById(`edit-dcaday-${globalIndex}`);
+                const dcaAmtInput = document.getElementById(`edit-dcaamt-${globalIndex}`);
+                if (dcaDayInput) h.dcaDay = parseInt(dcaDayInput.value) || 15;
+                if (dcaAmtInput) h.dcaAmount = parseFloat(dcaAmtInput.value) || 500;
             }
+
+            editingIndex = -1; // 關閉編輯模式
             renderTables();
-            showToast("調整成功", `持股已更新`, "success");
+            showToast("已更新", `${h.name} 數據已成功儲存！`, "success");
         }
 
         async function deleteHolding(globalIndex) {
             const h = holdingsData[globalIndex];
             if (confirm(`確定要將 ${h.name} (${h.symbol}) 徹底刪除嗎？`)) {
                 holdingsData.splice(globalIndex, 1);
+                if (editingIndex === globalIndex) editingIndex = -1;
                 renderTables();
 
                 try {
@@ -655,6 +674,8 @@
                     tr.addEventListener('dragend', handleDragEnd);
                 }
 
+                const isEditing = (editingIndex === globalIndex);
+
                 const displayCost = isUs ? formatMoney(h.avgCost * exchangeRate) : formatMoney(h.avgCost);
                 const displayPrice = hasValidPrice ? (isUs ? formatMoney(h.currentPrice * exchangeRate) : formatMoney(h.currentPrice)) : '<span class="text-rose-400 font-bold">???</span>';
                 const displayMarketVal = hasValidPrice ? formatMoney(marketValHkd) : '<span class="text-rose-400 font-bold">???</span>';
@@ -662,38 +683,78 @@
                 const pnlColor = pnlHkd >= 0 ? 'text-emerald-400' : 'text-rose-400';
 
                 if (h.isDca) {
-                    tr.innerHTML = `
-                        <td class="p-4 text-center text-gray-500">${manualSortStates.DCA ? '<span class="cursor-grab font-bold text-amber-400">⠿</span>' : '•'}</td>
-                        <td class="p-4 font-bold text-white"><span class="text-amber-400 font-bold">月供</span> <strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
-                        <td class="p-4 font-mono font-bold text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
-                        <td class="p-4 text-right font-mono"><input type="number" value="${h.dcaDay || 15}" onchange="holdingsData[${globalIndex}].dcaDay=this.value" class="w-16 bg-gray-800 text-center text-white rounded"> 號</td>
-                        <td class="p-4 text-right font-mono"><input type="number" value="${h.dcaAmount || 500}" onchange="holdingsData[${globalIndex}].dcaAmount=this.value" class="w-24 bg-gray-800 text-right text-amber-300 font-bold rounded"></td>
-                        <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
-                        <td class="p-4 text-right font-mono"><span class="font-bold">${displayMarketVal}</span><br><span class="${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</span></td>
-                        <td class="p-4 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="adjustShares(${globalIndex})" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded text-[10px] font-bold">調整</button>
-                                <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
-                            </div>
-                        </td>
-                    `;
+                    if (isEditing) {
+                        // 編輯模式 (月供)
+                        tr.innerHTML = `
+                            <td class="p-4 text-center text-gray-500">•</td>
+                            <td class="p-4 font-bold text-white"><span class="text-amber-400 font-bold">月供</span> <strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                            <td class="p-4 font-mono"><input type="number" step="any" id="edit-hands-${globalIndex}" value="${h.hands}" class="w-20 bg-gray-800 text-amber-300 font-bold px-2 py-1 rounded border border-amber-400/50"> ${isUs ? '股' : '手'}</td>
+                            <td class="p-4 text-right font-mono"><input type="number" id="edit-dcaday-${globalIndex}" value="${h.dcaDay || 15}" class="w-16 bg-gray-800 text-center text-white rounded border border-gray-700"> 號</td>
+                            <td class="p-4 text-right font-mono"><input type="number" step="any" id="edit-dcaamt-${globalIndex}" value="${h.dcaAmount || 500}" class="w-24 bg-gray-800 text-right text-amber-300 font-bold rounded border border-gray-700"></td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
+                            <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button onclick="toggleEditRow(${globalIndex})" class="px-2.5 py-1 bg-emerald-500 text-gray-950 rounded text-[10px] font-bold shadow-md">💾 儲存</button>
+                                    <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
+                                </div>
+                            </td>
+                        `;
+                    } else {
+                        // 一般顯示模式 (月供)
+                        tr.innerHTML = `
+                            <td class="p-4 text-center text-gray-500">${manualSortStates.DCA ? '<span class="cursor-grab font-bold text-amber-400">⠿</span>' : '•'}</td>
+                            <td class="p-4 font-bold text-white"><span class="text-amber-400 font-bold">月供</span> <strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                            <td class="p-4 font-mono font-bold text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
+                            <td class="p-4 text-right font-mono">${h.dcaDay || 15} 號</td>
+                            <td class="p-4 text-right font-mono text-amber-300 font-bold">${formatMoney(h.dcaAmount || 500)}</td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
+                            <td class="p-4 text-right font-mono"><span class="font-bold">${displayMarketVal}</span><br><span class="${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</span></td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button onclick="toggleEditRow(${globalIndex})" class="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold transition-all">✏️ 編輯</button>
+                                    <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
+                                </div>
+                            </td>
+                        `;
+                    }
                     tbodyDca.appendChild(tr);
                 } else {
-                    tr.innerHTML = `
-                        <td class="p-4 text-center text-gray-500">${manualSortStates[h.market] ? '<span class="cursor-grab font-bold text-amber-400">⠿</span>' : '•'}</td>
-                        <td class="p-4 font-bold text-white"><strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
-                        <td class="p-4 font-mono font-bold text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
-                        <td class="p-4 text-right font-mono">${displayCost}</td>
-                        <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
-                        <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
-                        <td class="p-4 text-right font-mono ${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</td>
-                        <td class="p-4 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="adjustShares(${globalIndex})" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded text-[10px] font-bold">調整</button>
-                                <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
-                            </div>
-                        </td>
-                    `;
+                    if (isEditing) {
+                        // 編輯模式 (一般股票)
+                        tr.innerHTML = `
+                            <td class="p-4 text-center text-gray-500">•</td>
+                            <td class="p-4 font-bold text-white"><strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                            <td class="p-4 font-mono"><input type="number" step="any" id="edit-hands-${globalIndex}" value="${h.hands}" class="w-20 bg-gray-800 text-amber-300 font-bold px-2 py-1 rounded border border-amber-400/50"> ${isUs ? '股' : '手'}</td>
+                            <td class="p-4 text-right font-mono"><input type="number" step="any" id="edit-cost-${globalIndex}" value="${h.avgCost}" class="w-24 bg-gray-800 text-right text-white font-mono px-2 py-1 rounded border border-amber-400/50"></td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
+                            <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
+                            <td class="p-4 text-right font-mono ${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button onclick="toggleEditRow(${globalIndex})" class="px-2.5 py-1 bg-emerald-500 text-gray-950 rounded text-[10px] font-bold shadow-md">💾 儲存</button>
+                                    <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
+                                </div>
+                            </td>
+                        `;
+                    } else {
+                        // 一般顯示模式 (一般股票)
+                        tr.innerHTML = `
+                            <td class="p-4 text-center text-gray-500">${manualSortStates[h.market] ? '<span class="cursor-grab font-bold text-amber-400">⠿</span>' : '•'}</td>
+                            <td class="p-4 font-bold text-white"><strong>${h.symbol}</strong><br><span class="text-[11px] text-amber-300 font-bold">${h.name}</span></td>
+                            <td class="p-4 font-mono font-bold text-amber-300">${h.hands} ${isUs ? '股' : '手'}</td>
+                            <td class="p-4 text-right font-mono">${displayCost}</td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
+                            <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
+                            <td class="p-4 text-right font-mono ${hasValidPrice ? pnlColor : 'text-rose-400'}">${displayPnl}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button onclick="toggleEditRow(${globalIndex})" class="px-2 py-1 bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold transition-all">✏️ 編輯</button>
+                                    <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 text-rose-400 rounded text-[10px] font-bold">刪除</button>
+                                </div>
+                            </td>
+                        `;
+                    }
                     if (isUs) tbodyUs.appendChild(tr);
                     else tbodyHk.appendChild(tr);
                 }
@@ -796,5 +857,3 @@
     </script>
 </body>
 </html>
-
-
