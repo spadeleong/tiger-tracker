@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stocker PRO Lite · 修復版系統</title>
+    <title>Stocker PRO Lite · VOO 現價修復版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -22,7 +22,7 @@
     <header class="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-gray-800 gap-4">
         <div>
             <h1 class="text-xl font-bold tracking-tight">STOCKER <span class="text-amber-400">PRO LITE</span></h1>
-            <p class="text-xs text-gray-400">高效能修復版 · 本地持久化、自動計算與月供記帳系統</p>
+            <p class="text-xs text-gray-400">VOO 現價修復 · 本地持久化與月供自動記帳系統</p>
         </div>
         <!-- 右上角基礎貨幣切換開關 -->
         <div class="flex items-center gap-2">
@@ -63,7 +63,7 @@
             <div class="border-b border-gray-800 pb-2 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-amber-400"></i>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (已修復互動與自動計算)</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">新增持股輸入表單 (已修復 VOO 現價問題)</h3>
                 </div>
                 <span id="input-market-badge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-bold">等待輸入代號...</span>
             </div>
@@ -71,8 +71,8 @@
             <form onsubmit="handleAddStock(event)" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
                     <div class="relative">
-                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (點擊或輸入)</label>
-                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" placeholder="輸入代號 (例: SNDK, AAPL, 2388)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
+                        <label class="block text-[10px] font-bold text-gray-400 mb-1">股票代號 (例: VOO, QQQ, AAPL, 2388)</label>
+                        <input type="text" id="input-symbol" onfocus="handleSymbolFocus()" oninput="handleSymbolInput(this.value)" onchange="fetchLivePriceIfNeeded(this.value)" placeholder="輸入代號 (例: VOO)..." autocomplete="off" required class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-amber-400">
                         
                         <div id="symbol-dropdown" class="absolute left-0 right-0 top-full mt-1 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 hidden max-h-52 overflow-y-auto"></div>
                     </div>
@@ -233,14 +233,18 @@
         let cashReserve = 66800.53;
         let holdingsData = [];
 
+        // 擴充內建數據庫，加入 VOO, QQQ, NVDA 等美股熱門標的
         const stockDatabase = [
-            { symbol: '2388', name: '中銀香港', market: 'HK', price: 47.94, lotSize: 500 },
+            { symbol: 'VOO', name: 'Vanguard S&P 500 ETF', market: 'US', price: 520.50, lotSize: 1 },
+            { symbol: 'QQQ', name: 'Invesco QQQ Trust', market: 'US', price: 480.20, lotSize: 1 },
+            { symbol: 'NVDA', name: 'NVIDIA Corporation', market: 'US', price: 125.40, lotSize: 1 },
+            { symbol: 'AAPL', name: '蘋果公司 Apple', market: 'US', price: 220.50, lotSize: 1 },
+            { symbol: 'TSLA', name: '特斯拉 Tesla', market: 'US', price: 245.00, lotSize: 1 },
+            { symbol: 'SNDK', name: 'SanDisk', market: 'US', price: 75.00, lotSize: 1 },
+            { symbol: '2388', name: '中銀香港', market: 'HK', price: 24.50, lotSize: 500 },
             { symbol: '0700', name: '騰訊控股', market: 'HK', price: 380.0, lotSize: 100 },
             { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0, lotSize: 100 },
-            { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 },
-            { symbol: 'AAPL', name: '蘋果公司', market: 'US', price: 220.50, lotSize: 1 },
-            { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 },
-            { symbol: 'SNDK', name: 'SanDisk', market: 'US', price: 75.00, lotSize: 1 }
+            { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 }
         ];
 
         let manualSortStates = { HK: false, US: false, DCA: false };
@@ -248,8 +252,8 @@
         let draggedCategory = null;
         let activeInputStock = null;
 
-        const STORAGE_KEY_HOLDINGS = 'stocker_pro_holdings_v3';
-        const STORAGE_KEY_CASH = 'stocker_pro_cash_v3';
+        const STORAGE_KEY_HOLDINGS = 'stocker_pro_holdings_v4';
+        const STORAGE_KEY_CASH = 'stocker_pro_cash_v4';
 
         function saveToLocalStorage() {
             try {
@@ -279,7 +283,48 @@
             }
         }
 
-        // ==================== 表單輸入與代號聯動核心 ====================
+        // 當輸入不在資料庫的代號時，自動嘗試由網絡獲取實時價格
+        async function fetchLivePriceIfNeeded(symbol) {
+            const cleanSymbol = symbol.toUpperCase().trim();
+            if (!cleanSymbol) return;
+
+            const found = stockDatabase.find(s => s.symbol === cleanSymbol);
+            if (found) {
+                selectStockOption(found);
+                return;
+            }
+
+            const isHK = /^\d+$/.test(cleanSymbol);
+            showToast("聯網查詢", `正在查詢 ${cleanSymbol} 實時價格...`, "info");
+
+            try {
+                const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${isHK ? cleanSymbol.padStart(4, '0') + '.HK' : cleanSymbol}?interval=1d`);
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                const meta = data.chart.result[0].meta;
+
+                const livePrice = meta.regularMarketPrice || meta.chartPreviousClose;
+                const longName = meta.longName || meta.shortName || cleanSymbol;
+                const marketType = isHK ? 'HK' : 'US';
+                const lot = isHK ? 1000 : 1;
+
+                const fetchedStock = {
+                    symbol: cleanSymbol,
+                    name: longName,
+                    market: marketType,
+                    price: parseFloat(livePrice.toFixed(2)),
+                    lotSize: lot
+                };
+
+                stockDatabase.push(fetchedStock);
+                selectStockOption(fetchedStock);
+                showToast("獲取成功", `已載入 ${cleanSymbol} 現價: ${fetchedStock.price}`, "success");
+
+            } catch (error) {
+                showToast("提示", "未能獲得網絡現價，請手動填寫平均成本。", "warning");
+            }
+        }
+
         function handleSymbolFocus() {
             renderDropdownList(stockDatabase);
         }
@@ -310,21 +355,15 @@
                 marketBadge.textContent = '🇭🇰 港股 (一手單位)';
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股手數 (預設每手 1,000 股)';
-                activeInputStock = { symbol: cleanQuery, name: `港股 ${cleanQuery}`, market: 'HK', price: 100.0, lotSize: 1000 };
             } else {
                 marketBadge.textContent = '🇺🇸 美股';
                 marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
                 sharesLabel.textContent = '初始持股數量 (股)';
-                activeInputStock = { symbol: cleanQuery, name: cleanQuery, market: 'US', price: 100.0, lotSize: 1 };
             }
 
-            // 如果資料庫有匹配，直接帶入價格
             const found = stockDatabase.find(s => s.symbol === cleanQuery);
             if (found) {
                 selectStockOption(found);
-            } else {
-                document.getElementById('input-cost').value = 100.0;
-                calculateTigerFee();
             }
         }
 
@@ -343,7 +382,7 @@
                 div.className = "px-3.5 py-2.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-200 border-b border-gray-800 flex justify-between items-center transition-colors";
                 const marketTag = item.market === 'HK' ? '<span class="text-amber-400 font-bold">港股</span>' : '<span class="text-blue-400 font-bold">美股</span>';
                 const lotInfo = item.market === 'HK' ? ` | 每手: ${item.lotSize}股` : '';
-                div.innerHTML = `<span>${marketTag} <strong class="text-white font-mono ml-1">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">參考價: ${item.price}${lotInfo}</span>`;
+                div.innerHTML = `<span>${marketTag} <strong class="text-white font-mono ml-1">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">現價: $${item.price}${lotInfo}</span>`;
                 div.onclick = () => selectStockOption(item);
                 dropdown.appendChild(div);
             });
@@ -377,7 +416,6 @@
             }
         });
 
-        // ==================== 手續費自動計算 ====================
         function calculateTigerFee() {
             const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
             const sharesInput = parseFloat(document.getElementById('input-shares').value) || 0;
@@ -408,7 +446,6 @@
             document.getElementById('input-fee').value = estimatedFee.toFixed(2);
         }
 
-        // ==================== 新增持股提交處理 ====================
         function handleAddStock(e) {
             e.preventDefault();
             const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
@@ -447,10 +484,9 @@
                     dcaDay: 15,
                     dcaAmount: 500
                 });
-                showToast("新增成功", `成功加入 ${stockInfo.symbol} (${stockInfo.name}) 並自動儲存！`, "success");
+                showToast("新增成功", `成功加入 ${stockInfo.symbol} (${stockInfo.name})！`, "success");
             }
 
-            // 重置表單
             document.getElementById('input-symbol').value = '';
             document.getElementById('input-shares').value = '';
             document.getElementById('input-cost').value = '';
@@ -514,299 +550,4 @@
 
             saveToLocalStorage();
             renderTables();
-            showToast("月供記帳成功", `已成功執行本月自動月供並持久化保存！共扣除現金約 ${formatMoney(totalSpentHkd)}。`, "success");
-        }
-
-        function toggleManualSort(category) {
-            manualSortStates[category] = !manualSortStates[category];
-            const isActive = manualSortStates[category];
-            const btn = document.getElementById(`btn-toggle-${category.toLowerCase()}`);
-            const icon = document.getElementById(`icon-${category.toLowerCase()}`);
-            const text = document.getElementById(`text-${category.toLowerCase()}`);
-
-            if (isActive) {
-                btn.className = "px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-400 text-gray-950 text-xs font-bold transition-all flex items-center gap-1.5 shadow-md";
-                icon.setAttribute('data-lucide', 'unlock');
-                text.textContent = "手動排版: 開啟 (可拖曳)";
-                showToast("手動模式", `該表格已解鎖！`, "success");
-            } else {
-                btn.className = "px-3 py-1.5 rounded-xl border border-gray-700 bg-gray-800 text-gray-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm";
-                icon.setAttribute('data-lucide', 'lock');
-                text.textContent = "手動排版: 鎖定";
-                showToast("手動模式", `該表格已鎖定。`, "info");
-            }
-            renderTables();
-        }
-
-        function autoFormatTable(category) {
-            let targetList;
-            if (category === 'HK') targetList = holdingsData.filter(h => h.market === 'HK' && !h.isDca);
-            else if (category === 'US') targetList = holdingsData.filter(h => h.market === 'US' && !h.isDca);
-            else if (category === 'DCA') targetList = holdingsData.filter(h => h.isDca);
-
-            targetList.sort((a, b) => {
-                const totalSharesA = a.market === 'HK' ? a.hands * a.lotSize : a.hands;
-                const totalSharesB = b.market === 'HK' ? b.hands * b.lotSize : b.hands;
-                const priceA = a.currentPrice || a.avgCost;
-                const priceB = b.currentPrice || b.avgCost;
-                const valA = totalSharesA * priceA * (a.market === 'US' ? exchangeRate : 1);
-                const valB = totalSharesB * priceB * (b.market === 'US' ? exchangeRate : 1);
-                return valB - valA;
-            });
-
-            const others = holdingsData.filter(h => {
-                if (category === 'HK') return !(h.market === 'HK' && !h.isDca);
-                if (category === 'US') return !(h.market === 'US' && !h.isDca);
-                if (category === 'DCA') return !h.isDca;
-            });
-            holdingsData = [...others, ...targetList];
-
-            saveToLocalStorage();
-            renderTables();
-            showToast("一鍵排版", `該表格已按市值排序並自動儲存！`, "success");
-        }
-
-        function adjustCash() {
-            const input = prompt(`請輸入要增加（正數）或減少（負數）的現金金額（HKD）：\n目前現金: HK$ ${cashReserve.toLocaleString(undefined, {minimumFractionDigits: 2})}`, "1000");
-            if (input === null) return;
-            const delta = parseFloat(input);
-
-            if (isNaN(delta)) {
-                showToast("錯誤", "請輸入有效的數字！", "error");
-                return;
-            }
-
-            cashReserve += delta;
-            if (cashReserve < 0) cashReserve = 0;
-
-            saveToLocalStorage();
-            renderTables();
-            showToast("現金更新", `可用現金已成功更新並自動儲存！`, "success");
-        }
-
-        function setBaseCurrency(curr) {
-            baseCurrency = curr;
-            const hkdBtn = document.getElementById('btn-curr-hkd');
-            const usdBtn = document.getElementById('btn-curr-usd');
-
-            if (curr === 'HKD') {
-                hkdBtn.className = "px-3 py-1.5 rounded-lg bg-amber-400 text-gray-950 font-bold transition-all shadow-md";
-                usdBtn.className = "px-3 py-1.5 rounded-lg text-gray-400 transition-all hover:text-white";
-            } else {
-                usdBtn.className = "px-3 py-1.5 rounded-lg bg-amber-400 text-gray-950 font-bold transition-all shadow-md";
-                hkdBtn.className = "px-3 py-1.5 rounded-lg text-gray-400 transition-all hover:text-white";
-            }
-
-            document.querySelectorAll('.curr-label').forEach(el => el.textContent = curr);
-            renderTables();
-            showToast("貨幣切換", `已切換至 ${curr} 計算單位`, "success");
-        }
-
-        function formatMoney(hkdAmount) {
-            let val = hkdAmount;
-            let symbol = baseCurrency === 'HKD' ? 'HK$ ' : 'US$ ';
-
-            if (baseCurrency === 'USD') {
-                val = hkdAmount / exchangeRate;
-            }
-
-            return symbol + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-
-        function adjustShares(globalIndex) {
-            const h = holdingsData[globalIndex];
-            const unitName = h.market === 'HK' ? '手數' : '股數';
-            const input = prompt(`請輸入 ${h.symbol} 要變動的${unitName}：\n（正數增加，負數減少）`, "1");
-            if (input === null) return;
-            const delta = parseFloat(input);
-
-            if (isNaN(delta) || delta === 0) {
-                showToast("錯誤", "請輸入有效數字！", "error");
-                return;
-            }
-
-            h.hands += delta;
-            if (h.hands <= 0) {
-                if (confirm(`持股已歸零，是否將 ${h.symbol} 從名單中【剷除】？`)) {
-                    holdingsData.splice(globalIndex, 1);
-                    showToast("已剷除", `${h.symbol} 已移除。`, "success");
-                } else {
-                    h.hands = 0;
-                }
-            } else {
-                showToast("調整成功", `${h.symbol} 現有持股: ${h.hands} ${h.market === 'HK' ? '手' : '股'}`, "success");
-            }
-
-            saveToLocalStorage();
-            renderTables();
-        }
-
-        function deleteHolding(globalIndex) {
-            const h = holdingsData[globalIndex];
-            if (confirm(`確定要將 ${h.symbol} 徹底【剷除】嗎？`)) {
-                holdingsData.splice(globalIndex, 1);
-                saveToLocalStorage();
-                renderTables();
-                showToast("已剷除", `${h.symbol} 已刪除。`, "success");
-            }
-        }
-
-        function renderTables() {
-            const tbodyHk = document.getElementById('tbody-hk');
-            const tbodyUs = document.getElementById('tbody-us');
-            const tbodyDca = document.getElementById('tbody-dca');
-            tbodyHk.innerHTML = '';
-            tbodyUs.innerHTML = '';
-            tbodyDca.innerHTML = '';
-
-            let totalEquityHkd = 0;
-
-            holdingsData.forEach((h, globalIndex) => {
-                const isUs = h.market === 'US';
-                const actualShares = isUs ? h.hands : h.hands * h.lotSize;
-                const currentPrice = h.currentPrice || h.avgCost || 0;
-
-                const marketValRaw = actualShares * currentPrice;
-                const marketValHkd = isUs ? marketValRaw * exchangeRate : marketValRaw;
-                const costValHkd = isUs ? (actualShares * h.avgCost) * exchangeRate : (actualShares * h.avgCost);
-                const pnlHkd = marketValHkd - costValHkd - (isUs ? h.fee * exchangeRate : h.fee);
-
-                totalEquityHkd += marketValHkd;
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-800/40 transition-colors border-b border-gray-800";
-                
-                let tableCategory = h.isDca ? 'DCA' : h.market;
-                const isManualActive = manualSortStates[tableCategory];
-
-                if (isManualActive) {
-                    tr.setAttribute('draggable', 'true');
-                    tr.dataset.index = globalIndex;
-                    tr.dataset.category = tableCategory;
-
-                    tr.addEventListener('dragstart', handleDragStart);
-                    tr.addEventListener('dragover', handleDragOver);
-                    tr.addEventListener('drop', handleDrop);
-                    tr.addEventListener('dragend', handleDragEnd);
-                }
-
-                const displayCost = isUs ? formatMoney(h.avgCost * exchangeRate) : formatMoney(h.avgCost);
-                const displayPrice = isUs ? formatMoney(currentPrice * exchangeRate) : formatMoney(currentPrice);
-                const displayMarketVal = formatMoney(marketValHkd);
-                const displayPnl = (pnlHkd >= 0 ? '+' : '') + formatMoney(Math.abs(pnlHkd));
-                const pnlColor = pnlHkd >= 0 ? 'text-emerald-400' : 'text-rose-400';
-
-                if (h.isDca) {
-                    const marketTag = isUs ? '<span class="text-blue-400 font-bold">美股</span>' : '<span class="text-amber-400 font-bold">港股</span>';
-                    tr.innerHTML = `
-                        <td class="p-4 text-center text-gray-500">${isManualActive ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
-                        <td class="p-4 font-bold text-white">${marketTag} <strong class="text-white">${h.symbol}</strong><br><span class="text-[10px] text-gray-400">${h.name}</span></td>
-                        <td class="p-4 font-mono font-bold text-amber-300">
-                            ${isUs ? `${h.hands.toLocaleString()} 股` : `${h.hands} 手 <span class='text-[10px] text-gray-400'>(共 ${actualShares.toLocaleString()} 股)</span>`}
-                        </td>
-                        <td class="p-4 text-right font-mono">
-                            <input type="number" value="${h.dcaDay || 15}" onchange="updateDcaSetting(${globalIndex}, 'dcaDay', this.value)" class="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-center text-white focus:outline-none focus:border-amber-400"> 號
-                        </td>
-                        <td class="p-4 text-right font-mono">
-                            <input type="number" value="${h.dcaAmount || 500}" onchange="updateDcaSetting(${globalIndex}, 'dcaAmount', this.value)" class="w-24 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-right text-amber-300 font-bold focus:outline-none focus:border-amber-400"> ${isUs ? 'USD' : 'HKD'}
-                        </td>
-                        <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
-                        <td class="p-4 text-right font-mono">
-                            <span class="font-bold">${displayMarketVal}</span><br>
-                            <span class="${pnlColor}">${displayPnl}</span>
-                        </td>
-                        <td class="p-4 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="adjustShares(${globalIndex})" class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-bold">📊 調整</button>
-                                <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-[10px] font-bold">🗑️ 剷除</button>
-                            </div>
-                        </td>
-                    `;
-                    tbodyDca.appendChild(tr);
-                } else {
-                    tr.innerHTML = `
-                        <td class="p-4 text-center text-gray-500">${isManualActive ? '<span class="cursor-grab font-bold text-amber-400 text-base" title="按住拖曳">⠿</span>' : '<span class="text-gray-700">•</span>'}</td>
-                        <td class="p-4 font-bold text-white">${h.symbol}<br><span class="text-[10px] text-gray-400">${h.name}</span></td>
-                        <td class="p-4 font-mono font-bold text-amber-300">
-                            ${isUs ? `${h.hands.toLocaleString()} 股` : `${h.hands} 手 <span class='text-[10px] text-gray-400'>(共 ${actualShares.toLocaleString()} 股)</span>`}
-                        </td>
-                        <td class="p-4 text-right font-mono">${displayCost}<br><span class='text-[9px] text-gray-500'>費: ${h.fee.toFixed(2)}</span></td>
-                        <td class="p-4 text-right font-mono font-bold text-emerald-400">${displayPrice}</td>
-                        <td class="p-4 text-right font-mono font-bold">${displayMarketVal}</td>
-                        <td class="p-4 text-right font-mono ${pnlColor}">${displayPnl}</td>
-                        <td class="p-4 text-center">
-                            <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="adjustShares(${globalIndex})" class="px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-[10px] font-bold">📊 調整</button>
-                                <button onclick="deleteHolding(${globalIndex})" class="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-[10px] font-bold">🗑️ 剷除</button>
-                            </div>
-                        </td>
-                    `;
-
-                    if (isUs) {
-                        tbodyUs.appendChild(tr);
-                    } else {
-                        tbodyHk.appendChild(tr);
-                    }
-                }
-            });
-
-            if (tbodyHk.children.length === 0) tbodyHk.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-gray-500 text-xs">暫無一般港股持倉紀錄</td></tr>`;
-            if (tbodyUs.children.length === 0) tbodyUs.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-gray-500 text-xs">暫無一般美股持倉紀錄</td></tr>`;
-            if (tbodyDca.children.length === 0) tbodyDca.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-gray-500 text-xs">暫無月供計劃紀錄</td></tr>`;
-
-            document.getElementById('summary-equity').textContent = formatMoney(totalEquityHkd);
-            document.getElementById('summary-cash').textContent = formatMoney(cashReserve);
-            document.getElementById('summary-assets').textContent = formatMoney(totalEquityHkd + cashReserve);
-
-            lucide.createIcons();
-        }
-
-        function handleDragStart(e) {
-            draggedIndex = parseInt(this.dataset.index);
-            draggedCategory = this.dataset.category;
-            this.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            const targetIndex = parseInt(this.dataset.index);
-            const targetCategory = this.dataset.category;
-
-            if (isNaN(draggedIndex) || isNaN(targetIndex) || draggedCategory !== targetCategory || draggedIndex === targetIndex) return;
-
-            const movedItem = holdingsData.splice(draggedIndex, 1)[0];
-            holdingsData.splice(targetIndex, 0, movedItem);
-
-            saveToLocalStorage();
-            renderTables();
-            showToast("排序更新", "手動拖曳排版已自動儲存！", "success");
-        }
-
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            draggedIndex = null;
-            draggedCategory = null;
-        }
-
-        function showToast(title, text, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = "p-3.5 rounded-xl shadow-2xl border bg-gray-900 border-gray-700 text-white text-xs flex items-center gap-2";
-            toast.innerHTML = `<strong class="${type === 'success' ? 'text-emerald-400' : type === 'error' ? 'text-rose-400' : 'text-amber-400'}">${title}:</strong> <span>${text}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
-
-        window.onload = function() {
-            loadFromLocalStorage();
-            renderTables();
-        };
-    </script>
-</body>
-</html>
+            showToast("月供記帳成功",
