@@ -245,13 +245,21 @@
         let exchangeRate = parseFloat(localStorage.getItem('stocker_ex_rate')) || 7.8;
         let cashReserve = parseFloat(localStorage.getItem('stocker_cash')) || 66800.53;
 
+        // 完整股票資料庫（包含熱門港美股與手數、現價設定）
         const stockDatabase = [
             { symbol: '2388', name: '中銀香港', market: 'HK', price: 47.94, lotSize: 500 },
             { symbol: '0700', name: '騰訊控股', market: 'HK', price: 380.0, lotSize: 100 },
             { symbol: '9988', name: '阿里巴巴-W', market: 'HK', price: 85.0, lotSize: 100 },
             { symbol: '0005', name: '匯豐控股', market: 'HK', price: 68.0, lotSize: 400 },
+            { symbol: '0939', name: '建設銀行', market: 'HK', price: 6.20, lotSize: 1000 },
+            { symbol: '1299', name: '友邦保險', market: 'HK', price: 58.50, lotSize: 200 },
+            { symbol: '3690', name: '美團-W', market: 'HK', price: 120.0, lotSize: 100 },
             { symbol: 'AAPL', name: '蘋果公司', market: 'US', price: 220.50, lotSize: 1 },
             { symbol: 'TSLA', name: '特斯拉', market: 'US', price: 245.00, lotSize: 1 },
+            { symbol: 'NVDA', name: '英偉達', market: 'US', price: 125.00, lotSize: 1 },
+            { symbol: 'MSFT', name: '微軟', market: 'US', price: 430.00, lotSize: 1 },
+            { symbol: 'GOOGL', name: 'Alphabet', market: 'US', price: 175.00, lotSize: 1 },
+            { symbol: 'AMZN', name: '亞馬遜', market: 'US', price: 185.00, lotSize: 1 },
             { symbol: 'SNDK', name: 'SanDisk', market: 'US', price: 75.00, lotSize: 1 }
         ];
 
@@ -277,7 +285,6 @@
         }
 
         async function fetchLiveExchangeRate() {
-            showToast("匯率更新", "正在取得最新 USD/HKD 匯率...", "info");
             try {
                 const proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/USDHKD=X?interval=1d`);
                 const response = await fetch(proxyUrl);
@@ -289,10 +296,9 @@
                     document.getElementById('exchange-rate-display').textContent = exchangeRate;
                     saveData();
                     renderTables();
-                    showToast("匯率更新成功", `當前 USD/HKD 匯率: ${exchangeRate}`, "success");
                 }
             } catch (error) {
-                showToast("提示", "無法聯網獲取即時匯率，維持使用當前匯率。", "warning");
+                // 靜默失敗，維持當前匯率
             }
         }
 
@@ -399,7 +405,6 @@
                 const addedShares = itemAmountHkd / h.currentPrice;
                 
                 if (h.market === 'HK') {
-                    // 港股以手為單位換算
                     const addedHands = addedShares / h.lotSize;
                     const totalCostVal = (h.hands * h.lotSize * h.avgCost) + itemAmountHkd;
                     h.hands += addedHands;
@@ -517,7 +522,7 @@
                 div.className = "px-3.5 py-2.5 hover:bg-gray-800 cursor-pointer text-xs text-gray-200 border-b border-gray-800 flex justify-between items-center transition-colors";
                 const marketTag = item.market === 'HK' ? '<span class="text-amber-400 font-bold">港股</span>' : '<span class="text-blue-400 font-bold">美股</span>';
                 const lotInfo = item.market === 'HK' ? ` | 每手: ${item.lotSize}股` : '';
-                div.innerHTML = `<span>${marketTag} <strong class="text-white font-mono ml-1">${item.symbol}</strong> -${item.name}</span> <span class="text-[10px] text-gray-400">參考價: ${item.price}${lotInfo}</span>`;
+                div.innerHTML = `<span>${marketTag} <strong class="text-white font-mono ml-1">${item.symbol}</strong> - ${item.name}</span> <span class="text-[10px] text-gray-400">參考價: ${item.price}${lotInfo}</span>`;
                 div.onclick = () => selectStockOption(item);
                 dropdown.appendChild(div);
             });
@@ -535,4 +540,27 @@
             if (item.market === 'HK') {
                 marketBadge.textContent = '🇭🇰 港股';
                 marketBadge.className = 'text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-bold';
-                sharesLabel.textContent = `持股手數 (
+                sharesLabel.textContent = `持股手數 (每手 ${item.lotSize} 股)`;
+            } else {
+                marketBadge.textContent = '🇺🇸 美股';
+                marketBadge.className = 'text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-bold';
+                sharesLabel.textContent = '持股數量 (股)';
+            }
+
+            calculateTigerFee();
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#input-symbol') && !e.target.closest('#symbol-dropdown')) {
+                document.getElementById('symbol-dropdown').classList.add('hidden');
+            }
+        });
+
+        function calculateTigerFee() {
+            const symbolInput = document.getElementById('input-symbol').value.toUpperCase().trim();
+            const sharesInput = parseFloat(document.getElementById('input-shares').value) || 0;
+            const costInput = parseFloat(document.getElementById('input-cost').value) || 0;
+
+            if (!symbolInput || sharesInput <= 0 || costInput <= 0) return;
+
+            const isHK = activeInputStock ? activeInputStock.market === 'HK' : /
